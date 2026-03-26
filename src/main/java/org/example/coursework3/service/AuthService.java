@@ -83,8 +83,6 @@ public class AuthService {
         return user;
     }
 
-
-
     public User register(String name,String email, String code, String password) {
         // 校验验证码
         try {
