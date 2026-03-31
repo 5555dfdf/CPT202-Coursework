@@ -23,6 +23,6 @@ spring:
 aliyun:
   mail:
     access-key-id:
-    access-key-secret:
-    region:
+    access-key-secret: 
+    region: cn-hangzhou
     from-address: service@mail.fulingyi.xyz
