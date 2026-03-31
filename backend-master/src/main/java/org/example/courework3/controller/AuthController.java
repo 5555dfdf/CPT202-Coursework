@@ -1,0 +1,64 @@
+package org.example.courework3.controller;
+
+import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
+import org.example.courework3.dto.CaptchaRequest;
+import org.example.courework3.dto.LoginRequest;
+import org.example.courework3.dto.RegisterRequest;
+import org.example.courework3.entity.User;
+import org.example.courework3.result.LoginResult;
+import org.example.courework3.result.RegisterResult;
+import org.example.courework3.result.Result;
+import org.example.courework3.service.AliyunMailService;
+import org.example.courework3.service.AuthService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/auth")
+@CrossOrigin
+@Slf4j
+public class AuthController {
+
+    @Autowired
+    private AuthService authService;
+    @Autowired
+    private AliyunMailService mailService;
+
+    @PostMapping("/login")
+    public Result<LoginResult> login(@RequestBody LoginRequest request) {
+       User user = authService.login(request.getEmail(),request.getPassword());
+       LoginResult loginResult = new LoginResult();
+       loginResult.setUser(user);
+       authService.storeToken(loginResult);
+       log.info("登录成功！已返回并存储相应token");
+       return Result.success(loginResult);
+
+    }
+    @PostMapping("/send-email-code")
+    public Result<Void> sendCaptcha(@Valid @RequestBody CaptchaRequest request) throws Exception {
+        mailService.sendCaptcha(request.getEmail());
+        log.info("向{}发送验证码",request.getEmail());
+        return Result.success("验证码已发送");
+    }
+
+    @PostMapping("/register")
+    public Result<RegisterResult> register(@RequestBody RegisterRequest request) {
+        User user = authService.register(request.getName(),request.getEmail(), request.getVerificationCode(), request.getPassword());
+        RegisterResult registerResult = new RegisterResult();
+        registerResult.setUser(user);
+        authService.storeToken(registerResult);
+        log.info("注册成功！已返回并存储相应token");
+        return Result.success(registerResult);
+    }
+
+    @PostMapping("/logout")
+    public Result<Void> logout(@RequestHeader("Authorization") String authHeader){
+        String token = authHeader.replace("Bearer ", "");
+        authService.deleteToken(token);
+        log.info("已登出！并删除相应token");
+        return Result.success("已登出");
+    }
+
+
+}

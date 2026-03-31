@@ -1,0 +1,29 @@
+### JetBrains IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+### Maven ###
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.nextDevelopment
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/
+
+### Logs ###
+*.log
+logs/
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+### Local Config ###
+# 如果你有存放敏感信息的本地配置文件，可以取消下面一行的注释
+# application-local.properties

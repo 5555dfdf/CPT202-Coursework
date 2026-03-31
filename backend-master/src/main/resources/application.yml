@@ -1,0 +1,28 @@
+spring:
+# database
+  datasource:
+    url: jdbc:mysql://localhost:3306/booking_system_db?useSSL=false&serverTimezone=UTC
+    username: root
+    password: 
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+# Redis
+  data:
+    redis:
+       host: localhost
+       port: 6379
+       database: 0
+
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+
+aliyun:
+  mail:
+    access-key-id:
+    access-key-secret:
+    region:
+    from-address: service@mail.fulingyi.xyz
