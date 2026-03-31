@@ -1,7 +1,6 @@
 package org.example.coursework3.controller;
 
 import lombok.extern.slf4j.Slf4j;
-import org.example.coursework3.result.SpecialistListResult;
 import org.example.coursework3.service.ViewInfoService;
 import org.example.coursework3.vo.ExpertiseVo;
 import org.example.coursework3.result.Result;
@@ -25,10 +24,4 @@ public class ViewController {
         return Result.success(viewInfoService.getExpertiseList());
     }
 
-    @GetMapping("/specialists")
-    public Result<SpecialistListResult> getSpecialistList() {
-//        SpecialistListResult result = new SpecialistListResult();
-        System.out.println(new SpecialistListResult());
-        return Result.success(new SpecialistListResult());
-    }
 }

@@ -28,6 +28,8 @@ public class SecurityConfig {
                         .requestMatchers("/me").permitAll()
                         .requestMatchers("/expertise/**").permitAll()
                         .requestMatchers("/pricing/quote").permitAll()
+                        .requestMatchers("/specialist/**").permitAll()
+                        .requestMatchers("/specialists/**").permitAll()
                         // 3. 其余请求需要认证
                         .anyRequest().authenticated()
                 );
