@@ -1,7 +1,6 @@
 package org.example.coursework3.service;
 
 import org.example.coursework3.dto.BookingPageResult;
-import org.example.coursework3.dto.RejectRequest;
 import org.example.coursework3.entity.*;
 import org.example.coursework3.exception.MsgException;
 import org.example.coursework3.repository.BookingRepository;
@@ -138,7 +137,5 @@ public class BookingService {
         return result;
     }
 
-//    public CompleteResult completeBooking(String authHeader, String bookingId) {
-//    }
 }
 
