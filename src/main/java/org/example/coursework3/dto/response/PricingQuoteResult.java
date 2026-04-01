@@ -1,4 +1,4 @@
-package org.example.coursework3.result;
+package org.example.coursework3.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

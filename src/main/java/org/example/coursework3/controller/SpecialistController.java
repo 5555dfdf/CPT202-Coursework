@@ -1,17 +1,12 @@
 package org.example.coursework3.controller;
 
-import lombok.Data;
-import org.apache.tomcat.util.compat.Jre21Compat;
-import org.example.coursework3.dto.BookingPageResult;
-import org.example.coursework3.dto.RejectRequest;
-import org.example.coursework3.entity.Role;
-import org.example.coursework3.entity.User;
-import org.example.coursework3.result.CompleteResult;
-import org.example.coursework3.result.ConfirmResult;
+import org.example.coursework3.dto.response.BookingPageResult;
+import org.example.coursework3.dto.request.RejectRequest;
+import org.example.coursework3.dto.response.CompleteResult;
+import org.example.coursework3.dto.response.ConfirmResult;
 
-import org.example.coursework3.result.RejectResult;
+import org.example.coursework3.dto.response.RejectResult;
 import org.example.coursework3.result.Result;
-import org.example.coursework3.service.AuthService;
 import org.example.coursework3.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;

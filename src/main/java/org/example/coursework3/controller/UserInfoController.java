@@ -2,9 +2,9 @@ package org.example.coursework3.controller;
 
 
 import lombok.extern.slf4j.Slf4j;
-import org.example.coursework3.dto.UpdateSelfInfoRequest;
+import org.example.coursework3.dto.request.UpdateSelfInfoRequest;
 import org.example.coursework3.result.Result;
-import org.example.coursework3.result.UserResult;
+import org.example.coursework3.dto.response.UserResult;
 import org.example.coursework3.service.AuthService;
 import org.example.coursework3.service.UpdateInfoService;
 import org.springframework.beans.factory.annotation.Autowired;

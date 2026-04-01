@@ -1,4 +1,4 @@
-package org.example.coursework3.dto;
+package org.example.coursework3.dto.request;
 
 import lombok.Data;
 

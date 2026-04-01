@@ -1,8 +1,8 @@
 package org.example.coursework3.controller;
 
 import lombok.extern.slf4j.Slf4j;
-import org.example.coursework3.dto.PricingQuoteRequest;
-import org.example.coursework3.result.PricingQuoteResult;
+import org.example.coursework3.dto.request.PricingQuoteRequest;
+import org.example.coursework3.dto.response.PricingQuoteResult;
 import org.example.coursework3.result.Result;
 import org.example.coursework3.service.PricingService;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,13 +1,13 @@
 package org.example.coursework3.service;
 
-import org.example.coursework3.dto.BookingPageResult;
+import org.example.coursework3.dto.response.BookingPageResult;
 import org.example.coursework3.entity.*;
 import org.example.coursework3.exception.MsgException;
 import org.example.coursework3.repository.BookingRepository;
 import org.example.coursework3.repository.UserRepository;
-import org.example.coursework3.result.CompleteResult;
-import org.example.coursework3.result.ConfirmResult;
-import org.example.coursework3.result.RejectResult;
+import org.example.coursework3.dto.response.CompleteResult;
+import org.example.coursework3.dto.response.ConfirmResult;
+import org.example.coursework3.dto.response.RejectResult;
 import org.example.coursework3.vo.BookingRequestVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;

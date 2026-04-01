@@ -5,7 +5,7 @@ import org.example.coursework3.exception.MsgException;
 import org.example.coursework3.entity.Role;
 import org.example.coursework3.entity.User;
 import org.example.coursework3.repository.UserRepository;
-import org.example.coursework3.result.AuthResult;
+import org.example.coursework3.dto.response.AuthResult;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import java.util.concurrent.TimeUnit;
