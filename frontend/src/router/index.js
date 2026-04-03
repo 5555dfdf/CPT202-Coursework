@@ -12,6 +12,7 @@ import DevLoginPage from '@/pages/public/DevLoginPage.vue'
 
 import CustomerSpecialistsPage from '@/pages/customer/CustomerSpecialistsPage.vue'
 import CustomerSpecialistDetailPage from '@/pages/customer/CustomerSpecialistDetailPage.vue'
+import CustomerSpecialistSlotsPage from '@/pages/customer/CustomerSpecialistSlotsPage.vue'
 import CustomerBookingsPage from '@/pages/customer/CustomerBookingsPage.vue'
 import CustomerBookingDetailPage from '@/pages/customer/CustomerBookingDetailPage.vue'
 import CustomerProfilePage from '@/pages/customer/CustomerProfilePage.vue'
@@ -59,6 +60,7 @@ const routes = [
       { path: '', redirect: '/customer/specialists' },
       { path: 'specialists', name: 'customer.specialists', component: CustomerSpecialistsPage },
       { path: 'specialists/:id', name: 'customer.specialistDetail', component: CustomerSpecialistDetailPage, props: true },
+      { path: 'specialists/:id/slots', name: 'customer.specialistSlots', component: CustomerSpecialistSlotsPage, props: true },
       { path: 'bookings', name: 'customer.bookings', component: CustomerBookingsPage },
       { path: 'bookings/:id', name: 'customer.bookingDetail', component: CustomerBookingDetailPage, props: true },
       { path: 'profile', name: 'customer.profile', component: CustomerProfilePage }
