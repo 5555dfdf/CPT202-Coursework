@@ -182,7 +182,6 @@ export const api = {
     request(http.post(`/specialist/bookings/${id}/reject`, payload)).then(extractDataPayload),
   completeBooking: (id) =>
     request(http.post(`/specialist/bookings/${id}/complete`)).then(extractDataPayload),
-
   adminListBookings: (params) => request(http.get('/admin/bookings', { params })).then(extractPagePayload),
   adminGetBooking: (id) => request(http.get(`/admin/bookings/${id}`)).then(extractDataPayload),
   adminListSlots: (params) => request(http.get('/admin/slots', { params })).then(extractListPayload),

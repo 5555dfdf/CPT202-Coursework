@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { ref, watch } from 'vue'
+import {onMounted, onUnmounted, ref, watch} from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 
@@ -48,6 +48,37 @@ async function run(action) {
     busy.value = ''
   }
 }
+
+// 1. 在顶层声明变量，不要在这里赋值
+let autoUpdateTimer = null
+
+async function handleAutoStatusUpdate() {
+  try {
+    const message = await api.triggerAutoStatusUpdate()
+    if (message) {
+      console.log(message)
+      await load()
+    }
+  } catch (e) {
+    console.error('Auto status update failed:', e?.message)
+  }
+}
+
+onMounted(() => {
+  // 立即执行一次
+  handleAutoStatusUpdate()
+
+  // 2. 赋值给顶层变量，去掉 const
+  autoUpdateTimer = setInterval(handleAutoStatusUpdate, 3600000)
+})
+
+onUnmounted(() => {
+  // 3. 现在这里可以正常访问到变量了
+  if (autoUpdateTimer) {
+    clearInterval(autoUpdateTimer)
+    autoUpdateTimer = null // 良好的习惯：清理引用
+  }
+})
 </script>
 
 <template>

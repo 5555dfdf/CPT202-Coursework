@@ -51,4 +51,7 @@ public class SpecialistController {
         CompleteResult completeResult = bookingService.completeBooking(authHeader,bookingId);
         return Result.success(completeResult);
     }
+
+
 }
+
