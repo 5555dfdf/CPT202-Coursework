@@ -49,7 +49,6 @@ public class User {
         this.updatedAt = now;
     }
 
-
     /**
      * 更新前自动填充
      */
