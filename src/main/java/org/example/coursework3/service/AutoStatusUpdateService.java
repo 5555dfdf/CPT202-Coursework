@@ -29,7 +29,7 @@ public class AutoStatusUpdateService {
     @Autowired
     private SlotRepository slotRepository;
 
-    @Scheduled(fixedRate = 3600000)
+    @Scheduled(fixedRate = 300000)
     @Transactional
     public void autoCancelPendingBookings() {
         OffsetDateTime now = OffsetDateTime.now();
@@ -60,7 +60,7 @@ public class AutoStatusUpdateService {
         }
     }
 
-    @Scheduled(fixedRate = 3600000)
+    @Scheduled(fixedRate = 300000)
     @Transactional
     public void autoCompleteConfirmedBookings() {
         OffsetDateTime now = OffsetDateTime.now();
