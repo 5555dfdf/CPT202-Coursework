@@ -18,7 +18,7 @@ public class BookingRequestVo {
         vo.setId(booking.getId());
         vo.setCustomerName(customerName);
         vo.setTime(slot.getStartTime()
-                .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+                .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
         vo.setStatus(booking.getStatus().name());
         return vo;
     }
