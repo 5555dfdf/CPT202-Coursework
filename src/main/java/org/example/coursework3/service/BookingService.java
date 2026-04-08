@@ -1,5 +1,6 @@
 package org.example.coursework3.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.coursework3.dto.response.BookingPageResult;
 import org.example.coursework3.entity.*;
 import org.example.coursework3.exception.MsgException;
@@ -18,10 +19,10 @@ import org.springframework.stereotype.Service;
 import org.example.coursework3.repository.SlotRepository;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class BookingService {
     @Autowired
@@ -145,33 +146,58 @@ public class BookingService {
     }
 
 
+//    @Transactional
+//    public void migrateFinishedBookingToHistory() {
+//        List<BookingStatus> statuses = List.of(
+//                BookingStatus.Cancelled, BookingStatus.Completed, BookingStatus.Rejected);
+//
+//
+//        List<Booking> finishedBookings = bookingRepository.findByStatusIn(statuses);
+//
+//        if (finishedBookings.isEmpty()) return;
+//
+//
+//
+//        List<BookingHistory> historyList = new ArrayList<>();
+//        for (Booking booking : finishedBookings) {
+//            BookingHistory history = new BookingHistory();
+//            history.setId(UUID.randomUUID().toString());
+//            history.setBookingId(booking.getId());
+//            history.setStatus(booking.getStatus());
+//            history.setReason(booking.getNote());
+//            history.setChangedAt(booking.getUpdatedAt());
+//            historyList.add(history);
+//
+//
+//        }
+//
+//        bookingHistoryRepository.saveAll(historyList);
+//    }
+
     @Transactional
-    public void migrateFinishedBookingToHistory() {
-        List<BookingStatus> statuses = List.of(
-                BookingStatus.Cancelled, BookingStatus.Completed, BookingStatus.Rejected);
+    public void createBookingHistory(Booking booking) {
+        // 1. 检查这条记录是否已经存在
+        boolean exists = bookingHistoryRepository
+                .existsByBookingIdAndStatus(
+                        booking.getId(),
+                        booking.getStatus()
+                );
 
-
-        List<Booking> finishedBookings = bookingRepository.findByStatusIn(statuses);
-
-        if (finishedBookings.isEmpty()) return;
-
-
-
-        List<BookingHistory> historyList = new ArrayList<>();
-        for (Booking booking : finishedBookings) {
-            BookingHistory history = new BookingHistory();
-            history.setId(UUID.randomUUID().toString());
-            history.setBookingId(booking.getId());
-            history.setStatus(booking.getStatus());
-            history.setReason(booking.getNote());
-            history.setChangedAt(booking.getUpdatedAt());
-            historyList.add(history);
-
-
+        if (exists) {
+            log.info("该状态记录已存在，跳过：{}", booking.getId());
+            return;
         }
 
-        bookingHistoryRepository.saveAll(historyList);
-//        bookingRepository.deleteAllInBatch(finishedBookings);
+        // 2. 只创建一条历史记录
+        BookingHistory history = new BookingHistory();
+        history.setId(UUID.randomUUID().toString());
+        history.setBookingId(booking.getId());
+        history.setStatus(booking.getStatus());
+        history.setReason(booking.getNote());
+        history.setChangedAt(booking.getUpdatedAt());
+
+        // 3. 只保存这一条
+        bookingHistoryRepository.save(history);
     }
 }
 

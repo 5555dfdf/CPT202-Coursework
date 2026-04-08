@@ -1,24 +1,40 @@
 package org.example.coursework3.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
-import org.example.coursework3.service.BookingService; // 假设你的方法在这个类里
+import org.example.coursework3.entity.Booking;
+import org.example.coursework3.service.BookingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 
 @Aspect
+@Slf4j
 @Configuration
 public class BookingMigrationAspect {
 
     @Autowired
     private BookingService bookingService;
 
-    @AfterReturning("execution(* org.example.coursework3.repository.BookingRepository.save*(..))")
-    public void afterBookingSave() {
+    // 获取刚刚保存成功的 Booking 对象 / list<Booking> auto-completed, rejected
+    @AfterReturning(
+            pointcut = "execution(* org.example.coursework3.repository.BookingRepository.save*(..))",
+            returning = "savedBooking"  // 拿到保存后的对象
+    )
+    public void afterBookingSave(Object savedBooking) {
         try {
-            bookingService.migrateFinishedBookingToHistory();
+            if (savedBooking instanceof Booking booking) {
+                bookingService.createBookingHistory(booking);
+            }
+            else if (savedBooking instanceof Iterable<?>) {
+                for (Object obj : (Iterable<?>) savedBooking) {
+                    if (obj instanceof Booking booking) {
+                        bookingService.createBookingHistory(booking);
+                    }
+                }
+            }
         } catch (Exception e) {
-            System.err.println("自动迁移任务执行失败: " + e.getMessage());
+            log.warn("状态历史记录失败: {}", e.getMessage());
         }
     }
 }
