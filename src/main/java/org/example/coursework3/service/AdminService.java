@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -46,7 +45,7 @@ public Specialist createSpecialist(CreateSpecialistRequest request) {
         expertiseList.add(expertise);
     }
     specialist.setExpertises(expertiseList);
-    specialistsRepository.save(specialist); // JPA 自动维护中间表
+    specialistsRepository.save(specialist); // JPA 自动维护中间表specialist_expertise
 
 
     return specialist;
@@ -101,8 +100,12 @@ public Specialist createSpecialist(CreateSpecialistRequest request) {
         return specialist;
     }
 
-
+    @Transactional
     public void deleteSpecialist(String id) {
+    User user = userRepository.getUserById(id);
+    Specialist specialist = specialistsRepository.getByUserId(id);
+    specialistsRepository.delete(specialist);
+    userRepository.delete(user);
     }
 
     public Expertise createExpertise(String name, String description) {

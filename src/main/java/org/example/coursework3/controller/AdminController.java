@@ -64,17 +64,19 @@ public class AdminController {
         return Result.success(adminService.updateSpecialistStatus(id, request.getStatus()));
     }
 
-//
-//    // 4. 删除专家
-//    @DeleteMapping("/specialists/{id}")
-//    public ResponseEntity<?> deleteSpecialist(@PathVariable String id) {
-//        try {
-//            adminService.deleteSpecialist(id);
-//            return ResponseEntity.ok(Map.of("message", "Specialist deleted successfully"));
-//        } catch (Exception e) {
-//            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-//        }
-//    }
+
+    // 4. 删除专家
+    @DeleteMapping("/specialists/{id}")
+    public Result<Void> deleteSpecialist(@RequestHeader("Authorization") String authHeader, @PathVariable String id) {
+        String token = authHeader.replace("Bearer ", "");
+        String userId = authService.getUserIdByToken(token);
+        Role role = authService.getRoleByUserId(userId);
+        if (role != Role.Admin) {
+            return Result.error("ERROR", "请以管理员身份修改");
+        }
+        adminService.deleteSpecialist(id);
+    return Result.success("删除成功");
+    }
 //
 //    // 5. 创建专长
 //    @PostMapping("/expertise")
