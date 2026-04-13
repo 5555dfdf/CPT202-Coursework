@@ -144,9 +144,26 @@ function normalizeError(err) {
   return { status, code, message, raw: err, data }
 }
 
+function throwIfBusinessError(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return
+  const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : ''
+  if (code === 'ERROR') {
+    const err = new Error(body.message || '请求失败')
+    throw normalizeError({
+      message: err.message,
+      response: {
+        status: 200,
+        data: body
+      }
+    })
+  }
+}
+
 async function request(promise) {
   try {
-    return unwrap(await promise)
+    const body = unwrap(await promise)
+    throwIfBusinessError(body)
+    return body
   } catch (err) {
     throw normalizeError(err)
   }
