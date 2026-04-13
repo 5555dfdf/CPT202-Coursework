@@ -46,7 +46,7 @@ watch(
   <section class="page">
     <header class="page__header">
       <h1>Specialist Details</h1>
-      <p class="muted mono">specialistId: {{ id }}</p>
+      <p class="subtitle">Review profile, expertise, and reference pricing before booking.</p>
     </header>
 
     <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
@@ -56,8 +56,16 @@ watch(
       <div class="card">
         <div class="title">{{ specialist.name ?? '—' }}</div>
         <p class="bio">{{ specialist.bio ?? 'No bio available.' }}</p>
-        <p class="muted small">Expertise: {{ expertiseLabel }}</p>
-        <p v-if="specialist.price != null" class="muted small">Reference Price: {{ specialist.price }}</p>
+        <div class="meta-list">
+          <div class="meta-item">
+            <span class="meta-key">Expertise</span>
+            <span class="meta-value">{{ expertiseLabel }}</span>
+          </div>
+          <div v-if="specialist.price != null" class="meta-item">
+            <span class="meta-key">Reference Price</span>
+            <span class="meta-value">￥{{ specialist.price }}</span>
+          </div>
+        </div>
       </div>
 
       <button type="button" class="btn-book" @click="goToBooking">
@@ -70,7 +78,13 @@ watch(
 <style scoped>
 .page__header h1 {
   margin: 0 0 6px;
-  font-size: 22px;
+  font-size: 28px;
+  font-weight: 800;
+}
+.subtitle {
+  margin: 0;
+  color: #5b6472;
+  font-size: 14px;
 }
 .muted {
   opacity: 0.8;
@@ -84,18 +98,46 @@ watch(
 }
 .card {
   margin-top: 14px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  border: 1px solid #e6e8ef;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  background: #ffffff;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
 }
 .title {
   font-weight: 700;
+  font-size: 20px;
   margin-bottom: 8px;
 }
 .bio {
   margin: 0 0 8px;
   line-height: 1.5;
+  color: #334155;
+}
+.meta-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.meta-key {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4b5563;
+  background: #f1f5f9;
+  border: 1px solid #dbe2ea;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.meta-value {
+  color: #111827;
+  font-size: 14px;
+  font-weight: 600;
 }
 .banner {
   margin-top: 14px;
@@ -122,6 +164,6 @@ watch(
   cursor: pointer;
 }
 .btn-book:hover {
-  opacity: 0.9;
+  background: #06ad56;
 }
 </style>

@@ -1,11 +1,13 @@
 <script setup>
 import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { showAlertModal } from '@/ui/alertModal'
 
 const props = defineProps({
   id: { type: String, required: true }
 })
+const router = useRouter()
 
 const slots = ref([])
 const slotDate = ref(new Date().toISOString().slice(0, 10))
@@ -68,7 +70,11 @@ async function submitBooking() {
     })
     note.value = ''
     selectedSlotId.value = ''
-    showAlertModal({ type: 'success', message: 'Booking request submitted successfully.' })
+    showAlertModal({
+      type: 'success',
+      message: 'Booking request submitted successfully.',
+      onClose: () => router.push({ name: 'customer.bookings' })
+    })
     await loadSlots()
   } catch (e) {
     error.value = e?.message || 'Failed to submit booking'
@@ -96,7 +102,7 @@ defineExpose({
   <section class="page">
     <header class="page__header">
       <h1>Specialist Available Slots</h1>
-      <p class="muted mono">specialistId: {{ id }}</p>
+      <p class="subtitle">Choose a date and an available time slot to submit your booking request.</p>
     </header>
 
     <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
@@ -156,7 +162,14 @@ defineExpose({
 <style scoped>
 .page__header h1 {
   margin: 0 0 6px;
-  font-size: 22px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.subtitle {
+  margin: 0;
+  color: #5b6472;
+  font-size: 14px;
 }
 
 .muted {
@@ -174,15 +187,17 @@ defineExpose({
 
 .card {
   margin-top: 14px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  border: 1px solid #e6e8ef;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  background: #ffffff;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
 }
 
 .title {
   font-weight: 700;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  font-size: 18px;
 }
 
 .field {
@@ -193,14 +208,15 @@ defineExpose({
 
 .label {
   font-size: 13px;
-  opacity: 0.85;
+  color: #4b5563;
+  font-weight: 600;
 }
 
 .input {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  border: 1px solid #d3d8e1;
   background: #ffffff;
   color: #111827;
   outline: none;
@@ -225,6 +241,10 @@ defineExpose({
   gap: 8px;
   flex-wrap: wrap;
   cursor: pointer;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #e6e8ef;
+  background: #f8fafc;
 }
 
 .banner {
@@ -256,6 +276,10 @@ defineExpose({
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background: #06ad56;
 }
 
 .btn-submit:disabled {
