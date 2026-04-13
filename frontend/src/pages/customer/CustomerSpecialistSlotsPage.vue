@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { api } from '@/api/client'
+import { showAlertModal } from '@/ui/alertModal'
 
 const props = defineProps({
   id: { type: String, required: true }
@@ -11,6 +12,8 @@ const slotDate = ref(new Date().toISOString().slice(0, 10))
 const selectedSlotId = ref('')
 const loading = ref(false)
 const error = ref('')
+const note = ref('')
+const submitting = ref(false)
 
 function formatSlotTime(value) {
   const raw = String(value ?? '').trim()
@@ -40,6 +43,38 @@ async function loadSlots() {
     error.value = e?.message || 'Failed to load slots'
   } finally {
     loading.value = false
+  }
+}
+
+async function submitBooking() {
+  if (!props.id) {
+    error.value = 'Missing specialistId'
+    showAlertModal({ type: 'error', message: error.value })
+    return
+  }
+  if (!selectedSlotId.value) {
+    error.value = 'Please select a slot first'
+    showAlertModal({ type: 'error', message: error.value })
+    return
+  }
+
+  submitting.value = true
+  error.value = ''
+  try {
+    await api.createBooking({
+      specialistId: props.id,
+      slotId: selectedSlotId.value,
+      note: note.value.trim() || undefined
+    })
+    note.value = ''
+    selectedSlotId.value = ''
+    showAlertModal({ type: 'success', message: 'Booking request submitted successfully.' })
+    await loadSlots()
+  } catch (e) {
+    error.value = e?.message || 'Failed to submit booking'
+    showAlertModal({ type: 'error', message: error.value })
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -93,6 +128,26 @@ defineExpose({
         </ul>
 
         <p v-else class="muted small">No available slots for this date.</p>
+
+        <label class="field field-note">
+          <span class="label">Note (optional)</span>
+          <textarea
+            v-model="note"
+            class="input input--area"
+            rows="3"
+            maxlength="300"
+            placeholder="Tell the specialist any context for this booking."
+          ></textarea>
+        </label>
+
+        <button
+          type="button"
+          class="btn-submit"
+          :disabled="submitting || !selectedSlotId"
+          @click="submitBooking"
+        >
+          {{ submitting ? 'Submitting...' : 'Submit Booking Request' }}
+        </button>
       </div>
     </template>
   </section>
@@ -151,6 +206,11 @@ defineExpose({
   outline: none;
 }
 
+.input--area {
+  min-height: 92px;
+  resize: vertical;
+}
+
 .slots {
   list-style: none;
   padding: 0;
@@ -178,5 +238,28 @@ defineExpose({
   border: 1px solid rgba(248, 113, 113, 0.45);
   background: rgba(248, 113, 113, 0.12);
   color: #991b1b;
+}
+
+.field-note {
+  margin-top: 12px;
+}
+
+.btn-submit {
+  margin-top: 10px;
+  width: 100%;
+  max-width: 260px;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: #07c160;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>
