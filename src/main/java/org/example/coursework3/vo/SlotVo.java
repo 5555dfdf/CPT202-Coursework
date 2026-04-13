@@ -9,7 +9,9 @@ public class SlotVo {
     private String start;
     private String end;
     private Boolean available;
-
+    private String bookingId;
+    private String customerName;
+    private String status;
     public static SlotVo fromSlot(Slot slot) {
         SlotVo vo = new SlotVo();
         vo.setSlotId(slot.getId());

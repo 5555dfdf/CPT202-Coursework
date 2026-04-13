@@ -35,6 +35,8 @@ public class BookingService {
     private SlotRepository slotRepository;
     @Autowired
     private BookingHistoryRepository bookingHistoryRepository;
+    @Autowired
+    private AliyunMailService aliyunMailService;
     public BookingPageResult getSpecialistBookings(String authHeader, String status, Integer page, Integer pageSize) {
         String token = authHeader.replace("Bearer ","");
         String specialistId = authService.getUserIdByToken(token);
@@ -98,6 +100,15 @@ public class BookingService {
         }
         booking.setStatus(BookingStatus.Confirmed);
         bookingRepository.save(booking);
+        //发送邮件逻辑
+        try {
+            User customer = userRepository.findById(booking.getCustomerId());
+            if (customer != null && customer.getEmail() != null) {
+                aliyunMailService.sendBookingStatusNotification(customer.getEmail(), "Confirmed", null);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send confirmation email notification: {}", e.getMessage());
+        }
         slot.setAvailable(Boolean.FALSE);
         slotRepository.save(slot);
         ConfirmResult result = new ConfirmResult();
@@ -120,6 +131,15 @@ public class BookingService {
         booking.setStatus(BookingStatus.Rejected);
         booking.setNote(reason);
         bookingRepository.save(booking);
+        //发送邮件
+        try {
+            User customer = userRepository.findById(booking.getCustomerId());
+            if (customer != null && customer.getEmail() != null) {
+                aliyunMailService.sendBookingStatusNotification(customer.getEmail(), "Rejected", reason);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send rejection email notification: {}", e.getMessage());
+        }
 
         RejectResult result = new RejectResult();
         result.setId(bookingId);
@@ -133,10 +153,10 @@ public class BookingService {
                 .orElseThrow(()-> new MsgException("No such reservation"));
 
         if (!booking.getSpecialistId().equals(specialistId)) {
-            throw new MsgException("No right to handle this reservation");
+            throw new MsgException("Without right to handle this reservation");
         }
         if (booking.getStatus() != BookingStatus.Confirmed){
-            throw new MsgException("Can just handling Confirmed reservations");
+            throw new MsgException("Can only handle Confirmed reservations");
         }
         booking.setStatus(BookingStatus.Completed);
         bookingRepository.save(booking);
