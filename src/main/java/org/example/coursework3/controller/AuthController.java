@@ -36,12 +36,12 @@ public class AuthController {
        return Result.success(loginResult);
 
     }
-//    @PostMapping("/send-email-code")
-//    public Result<Void> sendCaptcha(@Valid @RequestBody CaptchaRequest request) throws Exception {
-//        mailService.sendCaptcha(request.getEmail());
-//        log.info("向{}发送验证码",request.getEmail());
-//        return Result.success("验证码已发送");
-//    }
+    @PostMapping("/send-email-code")
+    public Result<Void> sendCaptcha(@Valid @RequestBody CaptchaRequest request) throws Exception {
+        mailService.sendCaptcha(request.getEmail());
+        log.info("向{}发送验证码",request.getEmail());
+        return Result.success("验证码已发送");
+    }
 
     @PostMapping("/register")
     public Result<RegisterResult> register(@RequestBody RegisterRequest request) {
