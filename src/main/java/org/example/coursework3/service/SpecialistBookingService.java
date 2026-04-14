@@ -4,9 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.coursework3.dto.response.BookingPageResult;
 import org.example.coursework3.entity.*;
 import org.example.coursework3.exception.MsgException;
-import org.example.coursework3.repository.BookingHistoryRepository;
-import org.example.coursework3.repository.BookingRepository;
-import org.example.coursework3.repository.UserRepository;
+import org.example.coursework3.repository.*;
 import org.example.coursework3.dto.response.CompleteResult;
 import org.example.coursework3.dto.response.ConfirmResult;
 import org.example.coursework3.dto.response.RejectResult;
@@ -16,7 +14,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.example.coursework3.repository.SlotRepository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -35,6 +32,11 @@ public class SpecialistBookingService {
     private SlotRepository slotRepository;
     @Autowired
     private BookingHistoryRepository bookingHistoryRepository;
+    @Autowired
+    private AliyunMailService aliyunMailService;
+    @Autowired
+    private SpecialistsRepository specialistsRepository;
+
     public BookingPageResult getSpecialistBookings(String authHeader, String status, Integer page, Integer pageSize) {
         String token = authHeader.replace("Bearer ","");
         String specialistId = authService.getUserIdByToken(token);
@@ -97,6 +99,16 @@ public class SpecialistBookingService {
         }
         booking.setStatus(BookingStatus.Confirmed);
         bookingRepository.save(booking);
+        //发送邮件逻辑
+        try {
+            User customer = userRepository.findById(booking.getCustomerId());
+            Specialist specialist = specialistsRepository.getByUserId(booking.getSpecialistId());
+            if (customer != null && customer.getEmail() != null) {
+                aliyunMailService.sendBookingStatusNotification(specialist.getName(), customer.getEmail(), "Confirmed", null);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send confirmation email notification: {}", e.getMessage());
+        }
         slot.setAvailable(Boolean.FALSE);
         slotRepository.save(slot);
         ConfirmResult result = new ConfirmResult();
@@ -123,6 +135,16 @@ public class SpecialistBookingService {
         Slot slot = slotRepository.getById(booking.getSlotId());
         slot.setAvailable(true);
         slotRepository.save(slot);
+        //发送邮件
+        try {
+            User customer = userRepository.findById(booking.getCustomerId());
+            Specialist specialist = specialistsRepository.getByUserId(booking.getSpecialistId());
+            if (customer != null && customer.getEmail() != null) {
+                aliyunMailService.sendBookingStatusNotification(specialist.getName(), customer.getEmail(), "Rejected", reason);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send rejection email notification: {}", e.getMessage());
+        }
         RejectResult result = new RejectResult();
         result.setId(bookingId);
         return result;
