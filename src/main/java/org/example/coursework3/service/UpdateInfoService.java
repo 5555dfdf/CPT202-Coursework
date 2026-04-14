@@ -2,7 +2,7 @@ package org.example.coursework3.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.coursework3.exception.MsgException;
-import org.example.coursework3.dto.UpdateSelfInfoRequest;
+import org.example.coursework3.dto.request.UpdateSelfInfoRequest;
 import org.example.coursework3.entity.User;
 import org.example.coursework3.repository.UserRepository;
 import org.springframework.stereotype.Service;

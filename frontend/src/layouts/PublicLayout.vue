@@ -6,13 +6,11 @@ const route = useRoute();
 const authRouteNames = [
   "login",
   "register",
-  "admin-register",
   "dev-login",
   "expert-admin-login",
   // Keep compatibility with component-style names if route naming changes later.
   "LoginPage",
   "RegisterPage",
-  "AdminRegisterPage",
   "DevLoginPage",
   "ExpertAdminLoginPage",
 ];

@@ -5,15 +5,37 @@ import { api } from '@/api/client'
 
 const status = ref('')
 const page = ref({ items: [], total: 0, page: 1, pageSize: 10 })
+const query = ref({ from: '', to: '', page: 1, pageSize: 10 })
 const loading = ref(false)
 const error = ref('')
+
+function formatTime(value) {
+  if (!value) return '—'
+  const t = String(value).trim()
+  const m = t.match(/^(\d{4}-\d{2}-\d{2})[T\s](\d{2}:\d{2})/)
+  if (m) return `${m[1]} ${m[2]}`
+  return t
+}
+
+function statusClass(v) {
+  const s = String(v ?? '').toLowerCase()
+  if (s === 'pending') return 'status--pending'
+  if (s === 'confirmed' || s === 'completed') return 'status--ok'
+  if (s === 'cancelled' || s === 'rejected') return 'status--bad'
+  return ''
+}
 
 async function load() {
   error.value = ''
   loading.value = true
   try {
-    const params = {}
+    const params = {
+      page: query.value.page,
+      pageSize: query.value.pageSize
+    }
     if (status.value) params.status = status.value
+    if (query.value.from) params.from = query.value.from
+    if (query.value.to) params.to = query.value.to
     page.value = await api.listMyBookings(params)
   } catch (e) {
     error.value = e?.message || 'Failed to load'
@@ -23,14 +45,38 @@ async function load() {
   }
 }
 
+function onSearch() {
+  query.value.page = 1
+  load()
+}
+
+function prevPage() {
+  if (query.value.page <= 1 || loading.value) return
+  query.value.page -= 1
+  load()
+}
+
+function nextPage() {
+  if (loading.value || query.value.page >= totalPages()) return
+  query.value.page += 1
+  load()
+}
+
+function totalPages() {
+  const total = Number(page.value.total || 0)
+  const size = Number(page.value.pageSize || query.value.pageSize || 10)
+  return Math.max(1, Math.ceil(total / size))
+}
+
 onMounted(load)
-watch(status, () => load())
+watch(status, () => onSearch())
 </script>
 
 <template>
   <section class="page">
     <header class="page__header">
       <h1>My Bookings</h1>
+      <p class="subtitle">Track your booking requests and check the latest status.</p>
     </header>
 
     <div class="toolbar card">
@@ -45,6 +91,23 @@ watch(status, () => load())
           <option value="Rejected">Rejected</option>
         </select>
       </label>
+      <label class="field">
+        <span class="label">From</span>
+        <input v-model="query.from" type="date" class="input" />
+      </label>
+      <label class="field">
+        <span class="label">To</span>
+        <input v-model="query.to" type="date" class="input" />
+      </label>
+      <label class="field">
+        <span class="label">Page Size</span>
+        <select v-model.number="query.pageSize" class="input">
+          <option :value="10">10</option>
+          <option :value="20">20</option>
+          <option :value="50">50</option>
+        </select>
+      </label>
+      <button type="button" class="btn btn--ghost" :disabled="loading" @click="onSearch">Search</button>
       <button type="button" class="btn" :disabled="loading" @click="load">Refresh</button>
     </div>
 
@@ -58,24 +121,41 @@ watch(status, () => load())
     </div>
 
     <ul v-else class="list">
-      <li v-for="b in page.items" :key="b.id" class="card row">
-        <div>
-          <div class="mono id">{{ b.id }}</div>
-          <div class="muted small">Time: {{ b.time ?? b.startTime ?? '—' }}</div>
-          <div class="status">{{ b.status ?? '—' }}</div>
+      <li v-for="(b, idx) in page.items" :key="b.id" class="card row">
+        <div class="main">
+          <div class="booking-no">Booking #{{ idx + 1 }}</div>
+          <div class="muted small">Schedule: {{ formatTime(b.time ?? b.startTime) }}</div>
+          <div class="muted small">Specialist: {{ b.specialistName ?? b.specialistId ?? '—' }}</div>
+          <div class="status" :class="statusClass(b.status)">{{ b.status ?? '—' }}</div>
         </div>
         <RouterLink class="link" :to="{ name: 'customer.bookingDetail', params: { id: b.id } }">
           Details
         </RouterLink>
       </li>
     </ul>
+
+    <div v-if="(page.items || []).length" class="pager">
+      <button type="button" class="btn btn--ghost" :disabled="loading || query.page <= 1" @click="prevPage">
+        Prev
+      </button>
+      <span class="pager__info">Page {{ page.page }} / {{ totalPages() }} · Total {{ page.total }}</span>
+      <button type="button" class="btn btn--ghost" :disabled="loading || query.page >= totalPages()" @click="nextPage">
+        Next
+      </button>
+    </div>
   </section>
 </template>
 
 <style scoped>
 .page__header h1 {
   margin: 0 0 6px;
-  font-size: 22px;
+  font-size: 28px;
+  font-weight: 800;
+}
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #5b6472;
 }
 .toolbar {
   display: flex;
@@ -84,9 +164,9 @@ watch(status, () => load())
   gap: 12px;
   margin-top: 14px;
   padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid #e6e8ef;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  background: #f8fafc;
 }
 .field {
   display: grid;
@@ -99,19 +179,25 @@ watch(status, () => load())
 .input {
   min-width: 160px;
   padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  border: 1px solid #d3d8e1;
   background: #ffffff;
   color: #111827;
 }
 .btn {
   padding: 10px 16px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.1);
-  color: inherit;
+  border: 1px solid #07c160;
+  background: #07c160;
+  color: #ffffff;
+  font-weight: 700;
   cursor: pointer;
   height: 42px;
+}
+.btn--ghost {
+  border: 1px solid #d3d8e1;
+  background: #ffffff;
+  color: #334155;
 }
 .btn:disabled {
   opacity: 0.5;
@@ -124,10 +210,11 @@ watch(status, () => load())
   margin-top: 4px;
 }
 .card {
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  border: 1px solid #e6e8ef;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  background: #ffffff;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
 }
 .row {
   display: flex;
@@ -142,23 +229,59 @@ watch(status, () => load())
   display: grid;
   gap: 10px;
 }
-.id {
-  font-weight: 600;
+.main {
+  min-width: 0;
+}
+.booking-no {
+  font-weight: 700;
+  font-size: 16px;
+  color: #111827;
 }
 .status {
-  margin-top: 6px;
-  font-size: 13px;
-  font-weight: 600;
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #d0d7e2;
+  background: #f8fafc;
+  color: #334155;
+}
+.status--pending {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #9a3412;
+}
+.status--ok {
+  background: #ecfdf3;
+  border-color: #86efac;
+  color: #166534;
+}
+.status--bad {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
 }
 .mono {
   font-family: ui-monospace, monospace;
   font-size: 12px;
 }
 .link {
-  color: inherit;
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid #07c160;
+  background: #07c160;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
 }
 .banner {
   margin-top: 14px;
@@ -174,11 +297,33 @@ watch(status, () => load())
 .empty {
   margin-top: 16px;
   padding: 18px;
-  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border: 1px dashed #cfd5df;
   border-radius: 14px;
+  background: #fbfcfe;
 }
 .empty__title {
   font-weight: 700;
   margin-bottom: 6px;
+}
+.pager {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pager__info {
+  font-size: 13px;
+  color: #475569;
+}
+
+@media (max-width: 720px) {
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .link {
+    width: 100%;
+  }
 }
 </style>

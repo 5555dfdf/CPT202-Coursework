@@ -236,10 +236,6 @@ async function onSubmit() {
           Already have an account?
           <router-link to="/login">Log in</router-link>
         </p>
-        <p class="hint alt-hint">
-          Not a Customer?
-          <router-link :to="{ name: 'admin-register' }">Admin Register</router-link>
-        </p>
       </article>
     </div>
   </section>

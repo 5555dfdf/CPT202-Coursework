@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
+import { showAlertModal } from '@/ui/alertModal'
 
 const page = ref({ items: [], total: 0, page: 1, pageSize: 10 })
 const loading = ref(false)
@@ -99,8 +100,10 @@ async function load() {
     if (e?.status === 404) {
       missingApi.value = true
       error.value = 'Admin bookings endpoint is not available (404)'
+      showAlertModal({ type: 'warn', message: error.value })
     } else {
       error.value = e?.message || 'Failed to load bookings'
+      showAlertModal({ type: 'error', message: error.value })
     }
     page.value = { items: [], total: 0, page: 1, pageSize: 10 }
   } finally {
@@ -127,10 +130,13 @@ async function toggleBooking(row) {
     const detail = await api.adminGetBooking(id)
     detailMap.value = { ...detailMap.value, [id]: detail }
   } catch (e) {
+    const msg =
+      e?.status === 404 ? 'Booking detail endpoint is not available (404)' : e?.message || 'Failed to load booking detail'
     detailErrorMap.value = {
       ...detailErrorMap.value,
-      [id]: e?.status === 404 ? 'Booking detail endpoint is not available (404)' : e?.message || 'Failed to load booking detail'
+      [id]: msg
     }
+    showAlertModal({ type: e?.status === 404 ? 'warn' : 'error', message: msg })
   } finally {
     if (detailLoadingId.value === id) {
       detailLoadingId.value = ''
@@ -149,10 +155,6 @@ onMounted(load)
         Review all bookings and inspect booking details inline.
       </p>
     </header>
-
-    <div v-if="error" class="banner" :class="missingApi ? 'banner--warn' : 'banner--error'" role="alert">
-      {{ error }}
-    </div>
 
     <section class="calc-card list-card">
       <div class="list-toolbar">
@@ -226,7 +228,7 @@ onMounted(load)
               Loading booking detail...
             </div>
 
-            <div v-else-if="detailError(bookingId(booking))" class="banner banner--error banner--inline" role="alert">
+            <div v-else-if="detailError(bookingId(booking))" class="state muted">
               {{ detailError(bookingId(booking)) }}
             </div>
 

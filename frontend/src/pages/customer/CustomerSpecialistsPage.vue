@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { api } from '@/api/client'
@@ -10,6 +10,16 @@ const keyword = ref('')
 const loading = ref(false)
 const error = ref('')
 
+const expertiseMap = computed(() => {
+  const map = new Map()
+  for (const item of expertiseList.value || []) {
+    const id = String(item?.id ?? '').trim()
+    if (!id) continue
+    map.set(id, String(item?.name ?? id))
+  }
+  return map
+})
+
 const filteredItems = computed(() => {
   const q = keyword.value.trim().toLowerCase()
   const items = page.value.items ?? []
@@ -20,6 +30,12 @@ const filteredItems = computed(() => {
     return name.includes(q) || ids.includes(q)
   })
 })
+
+function specialistExpertiseLabel(s) {
+  const ids = Array.isArray(s?.expertiseIds) ? s.expertiseIds.map((id) => String(id)) : []
+  if (!ids.length) return '—'
+  return ids.map((id) => expertiseMap.value.get(id) || id).join(', ')
+}
 
 async function loadExpertise() {
   try {
@@ -56,6 +72,7 @@ watch(expertiseId, () => loadSpecialists())
   <section class="page">
     <header class="page__header">
       <h1>Specialists</h1>
+      <p class="subtitle">Find the right specialist and view available booking details.</p>
     </header>
 
     <div class="panel">
@@ -86,10 +103,12 @@ watch(expertiseId, () => loadSpecialists())
 
     <ul v-else class="list">
       <li v-for="s in filteredItems" :key="s.id" class="card card--row">
-        <div>
+        <div class="card-main">
           <div class="name">{{ s.name ?? '—' }}</div>
-          <div class="muted small mono">ID: {{ s.id ?? '—' }}</div>
-          <div v-if="s.price != null" class="muted small">Reference Price: {{ s.price }}</div>
+          <div class="meta-line">
+            <span class="meta-chip">Expertise: {{ specialistExpertiseLabel(s) }}</span>
+            <span v-if="s.price != null" class="meta-chip">Reference Price: {{ s.price }}</span>
+          </div>
         </div>
         <RouterLink class="link" :to="{ name: 'customer.specialistDetail', params: { id: s.id } }">
           View Details
@@ -102,18 +121,26 @@ watch(expertiseId, () => loadSpecialists())
 <style scoped>
 .page__header h1 {
   margin: 0 0 6px;
-  font-size: 22px;
+  font-size: 28px;
+  font-weight: 800;
 }
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #5b6472;
+}
+
 .panel {
   margin-top: 14px;
   display: grid;
   grid-template-columns: 1fr 1fr auto;
   gap: 12px;
   align-items: end;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  border: 1px solid #e6e8ef;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  background: #f8fafc;
 }
 .field {
   display: grid;
@@ -121,29 +148,47 @@ watch(expertiseId, () => loadSpecialists())
 }
 .label {
   font-size: 13px;
-  opacity: 0.85;
+  color: #4b5563;
+  font-weight: 600;
 }
 .input {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  border: 1px solid #d3d8e1;
   background: #ffffff;
   color: #111827;
   outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
+
+.input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
 select.input {
   cursor: pointer;
 }
 .btn {
-  padding: 10px 16px;
+  padding: 10px 18px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.1);
-  color: inherit;
+  border: 1px solid #07c160;
+  background: #07c160;
+  color: #ffffff;
+  font-weight: 700;
   cursor: pointer;
   height: 42px;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
+
+.btn:hover:not(:disabled) {
+  opacity: 1;
+  background: #06ad56;
+  border-color: #06ad56;
+  transform: translateY(-1px);
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -169,8 +214,9 @@ select.input {
 .empty {
   margin-top: 16px;
   padding: 18px;
-  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border: 1px dashed #cfd5df;
   border-radius: 14px;
+  background: #fbfcfe;
 }
 .empty__title {
   font-weight: 700;
@@ -184,33 +230,83 @@ select.input {
   gap: 10px;
 }
 .card {
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  border: 1px solid #e6e8ef;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  background: #ffffff;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
 }
 .card--row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
 }
+
+.card-main {
+  min-width: 0;
+}
+
 .name {
   font-weight: 700;
+  font-size: 17px;
+  color: #111827;
+}
+
+.meta-line {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid #d7dde8;
+  background: #f8fafc;
+  font-size: 12px;
+  color: #374151;
 }
 .mono {
   font-family: ui-monospace, monospace;
 }
 .link {
-  color: inherit;
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 110px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid #07c160;
+  background: #07c160;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
   white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.link:hover {
+  background: #06ad56;
+  border-color: #06ad56;
+  color: #ffffff;
 }
 @media (max-width: 720px) {
   .panel {
     grid-template-columns: 1fr;
+  }
+
+  .card--row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .link {
+    width: 100%;
   }
 }
 </style>

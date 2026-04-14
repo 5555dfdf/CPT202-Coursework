@@ -178,11 +178,6 @@ async function onSubmit() {
           </button>
         </form>
 
-        <p class="hint">
-          No Admin account?
-          <router-link :to="{ name: 'admin-register' }">Sign up</router-link>
-        </p>
-
         <p class="hint alt-hint">
           Not Expert/Admin?
           <router-link :to="{ name: 'login' }">Log as Customer</router-link>

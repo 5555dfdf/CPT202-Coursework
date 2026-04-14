@@ -17,7 +17,7 @@ public class Pricing {
 
 
     @JoinColumn(name = "specialist_id", nullable = false)
-    @Column(name = "specialist_id")
+    @Column(name = "specialist_id", length = 36)
     private String specialistId;
 
     private Integer duration;

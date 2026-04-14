@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { api } from '@/api/client'
 import { BadgeDollarSign, CalendarCheck, ChevronRight, Clock3 } from '@lucide/vue'
+import { showAlertModal } from '@/ui/alertModal'
 
 const expertiseCount = ref(0)
 const specialistTotal = ref(0)
@@ -18,6 +19,7 @@ async function load() {
     specialistTotal.value = sp.total ?? (sp.items || []).length
   } catch (e) {
     error.value = e?.message || 'Failed to load'
+    showAlertModal({ type: 'error', message: error.value })
   } finally {
     loading.value = false
   }
@@ -31,8 +33,6 @@ onMounted(load)
     <header class="page__header">
       <h1>Welcome</h1>
     </header>
-
-    <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
 
     <section class="summary-card">
       <div class="summary-card__title">Resource Overview</div>

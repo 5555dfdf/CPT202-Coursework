@@ -9,4 +9,8 @@ import java.util.List;
 public interface ExpertiseRepository extends JpaRepository<Expertise, String> {
     @NotNull
     List<Expertise> findAll();
+
+    boolean existsByName(String name);
+
+    Expertise getExpertiseById(String id);
 }

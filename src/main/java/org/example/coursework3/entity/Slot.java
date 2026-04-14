@@ -6,8 +6,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-
 @Entity
 @Table(name = "slots")
 @Data
@@ -20,19 +18,19 @@ public class Slot {
     private String specialistId;
 
     @Column(name = "start_time",nullable = false)
-    private OffsetDateTime startTime;
+    private LocalDateTime startTime;
 
     @Column(name = "end_time",nullable = false)
-    private OffsetDateTime endTime;
+    private LocalDateTime endTime;
 
     @Column(nullable = false)
     private Boolean available = true;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
-    private OffsetDateTime createdAt;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at")
-    private OffsetDateTime updatedAt;
+    private LocalDateTime updatedAt;
 }

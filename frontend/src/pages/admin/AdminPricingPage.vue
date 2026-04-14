@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { api } from '@/api/client'
+import { showAlertModal } from '@/ui/alertModal'
 
 const specialistId = ref('')
 const resolvedSpecialistId = ref('')
@@ -304,6 +305,7 @@ async function onQuote() {
 
   if (!specialistId.value.trim()) {
     error.value = 'Please enter a specialist name or ID'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
 
@@ -331,6 +333,7 @@ async function onQuote() {
       if (!firstRecord) {
         error.value = 'No quote available for the selected specialist and filters'
         resultMode.value = 'single'
+        showAlertModal({ type: 'warn', message: error.value })
         return
       }
 
@@ -373,6 +376,7 @@ async function onQuote() {
       error.value =
         firstFailure?.reason?.message || 'No quote combinations available for this specialist'
       resultMode.value = 'list'
+      showAlertModal({ type: 'warn', message: error.value })
       return
     }
 
@@ -381,6 +385,7 @@ async function onQuote() {
     appendHistoryItems(normalizedResults)
   } catch (e) {
     error.value = e?.message || 'Failed to get quote'
+    showAlertModal({ type: 'error', message: error.value })
   } finally {
     loading.value = false
   }
@@ -471,7 +476,6 @@ async function onQuote() {
             {{ loading ? 'Calculating...' : 'Calculate Quote' }}
           </button>
 
-          <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
         </div>
       </section>
 

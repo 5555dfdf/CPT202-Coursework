@@ -6,12 +6,12 @@ import AppLayout from '@/layouts/AppLayout.vue'
 
 import LoginPage from '@/pages/public/LoginPage.vue'
 import ExpertAdminLoginPage from '@/pages/public/ExpertAdminLoginPage.vue'
-import AdminRegisterPage from '@/pages/public/AdminRegisterPage.vue'
 import RegisterPage from '@/pages/public/RegisterPage.vue'
 import DevLoginPage from '@/pages/public/DevLoginPage.vue'
 
 import CustomerSpecialistsPage from '@/pages/customer/CustomerSpecialistsPage.vue'
 import CustomerSpecialistDetailPage from '@/pages/customer/CustomerSpecialistDetailPage.vue'
+import CustomerSpecialistSlotsPage from '@/pages/customer/CustomerSpecialistSlotsPage.vue'
 import CustomerBookingsPage from '@/pages/customer/CustomerBookingsPage.vue'
 import CustomerBookingDetailPage from '@/pages/customer/CustomerBookingDetailPage.vue'
 import CustomerProfilePage from '@/pages/customer/CustomerProfilePage.vue'
@@ -46,7 +46,6 @@ const routes = [
     children: [
       { path: 'login', name: 'login', component: LoginPage },
       { path: 'expert-admin-login', name: 'expert-admin-login', component: ExpertAdminLoginPage },
-      { path: 'admin-register', name: 'admin-register', component: AdminRegisterPage },
       { path: 'register', name: 'register', component: RegisterPage },
       { path: 'dev-login', name: 'dev-login', component: DevLoginPage }
     ]
@@ -59,6 +58,7 @@ const routes = [
       { path: '', redirect: '/customer/specialists' },
       { path: 'specialists', name: 'customer.specialists', component: CustomerSpecialistsPage },
       { path: 'specialists/:id', name: 'customer.specialistDetail', component: CustomerSpecialistDetailPage, props: true },
+      { path: 'specialists/:id/slots', name: 'customer.specialistSlots', component: CustomerSpecialistSlotsPage, props: true },
       { path: 'bookings', name: 'customer.bookings', component: CustomerBookingsPage },
       { path: 'bookings/:id', name: 'customer.bookingDetail', component: CustomerBookingDetailPage, props: true },
       { path: 'profile', name: 'customer.profile', component: CustomerProfilePage }

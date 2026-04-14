@@ -5,7 +5,7 @@ import org.example.coursework3.exception.MsgException;
 import org.example.coursework3.entity.Role;
 import org.example.coursework3.entity.User;
 import org.example.coursework3.repository.UserRepository;
-import org.example.coursework3.result.AuthResult;
+import org.example.coursework3.dto.response.AuthResult;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,6 +18,30 @@ public class AuthService {
     private final StringRedisTemplate redisTemplate;
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+
+    public boolean verifyAsAdmin(String authHeader){
+//        String token = authHeader.replace("Bearer ", "");
+//        String userId = getUserIdByToken(token);
+//        Role role = getRoleByUserId(userId);
+        return getRoleByAuth(authHeader) == Role.Admin;
+    }
+
+    public boolean verifyAsSpecialist(String authHeader){
+        return getRoleByAuth(authHeader) == Role.Specialist;
+    }
+
+    public boolean verifyAsCustomer(String authHeader){
+        return getRoleByAuth(authHeader) == Role.Customer;
+    }
+
+    public Role getRoleByAuth(String authHeader){
+        return getRoleByUserId(getUserIdByAuth(authHeader));
+    }
+
+    public String getUserIdByAuth(String authHeader){
+        String token = authHeader.replace("Bearer ", "");
+        return getUserIdByToken(token);
+    }
 
     public void storeToken(AuthResult result) {
         storeToken(result.getToken(), result.getUser().getId());
@@ -122,5 +146,10 @@ public class AuthService {
         } catch (RuntimeException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public Role getRoleByUserId(String userId) {
+        User user = userRepository.findById(userId);
+        return user.getRole();
     }
 }

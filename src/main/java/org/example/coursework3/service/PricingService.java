@@ -2,10 +2,10 @@ package org.example.coursework3.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.coursework3.exception.MsgException;
-import org.example.coursework3.dto.PricingQuoteRequest;
+import org.example.coursework3.dto.request.PricingQuoteRequest;
 import org.example.coursework3.entity.Pricing;
 import org.example.coursework3.repository.PricingRepository;
-import org.example.coursework3.result.PricingQuoteResult;
+import org.example.coursework3.dto.response.PricingQuoteResult;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;

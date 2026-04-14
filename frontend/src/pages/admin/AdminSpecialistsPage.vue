@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
+import { showAlertModal } from '@/ui/alertModal'
 
 const expertiseList = ref([])
 const page = ref({ items: [], total: 0 })
@@ -11,6 +12,8 @@ const searchQuery = ref('')
 
 const form = ref({
   name: '',
+  userEmail: '',
+  password: '',
   price: '',
   bio: '',
   expertiseIds: []
@@ -64,10 +67,10 @@ const filteredExpertiseOptions = computed(() => {
 })
 
 const selectedExpertise = computed(() =>
-  (form.value.expertiseIds || []).map((id) => expertiseMap.value.get(String(id)) || { id, name: id })
+    (form.value.expertiseIds || []).map((id) => expertiseMap.value.get(String(id)) || { id, name: id })
 )
 const selectedEditExpertise = computed(() =>
-  (editForm.value.expertiseIds || []).map((id) => expertiseMap.value.get(String(id)) || { id, name: id })
+    (editForm.value.expertiseIds || []).map((id) => expertiseMap.value.get(String(id)) || { id, name: id })
 )
 
 const filteredSpecialists = computed(() => {
@@ -246,8 +249,8 @@ function specialistExpertiseNames(row) {
 
   if (Array.isArray(row?.expertise)) {
     const names = row.expertise
-      .map((item) => String(item?.name ?? '').trim())
-      .filter(Boolean)
+        .map((item) => String(item?.name ?? '').trim())
+        .filter(Boolean)
     if (names.length) return names
   }
 
@@ -283,6 +286,7 @@ async function loadSpecialists() {
     page.value = await api.listSpecialists({ pageSize: 100 })
   } catch (e) {
     error.value = e?.message || 'Failed to load specialists'
+    showAlertModal({ type: 'error', message: error.value })
     page.value = { items: [], total: 0 }
   } finally {
     loading.value = false
@@ -295,10 +299,17 @@ async function onCreate() {
 
   if (!form.value.name.trim()) {
     error.value = 'Please enter a name'
+    showAlertModal({ type: 'error', message: error.value })
+    return
+  }
+  if (!form.value.userEmail.trim()) {
+    error.value = 'Please enter user email'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
   if (!form.value.expertiseIds.length) {
     error.value = 'Please select at least one expertise item'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
 
@@ -307,11 +318,13 @@ async function onCreate() {
     const price = form.value.price === '' ? undefined : Number(form.value.price)
     await api.adminCreateSpecialist({
       name: form.value.name.trim(),
+      userEmail: form.value.userEmail.trim(),
+      password: form.value.password.trim() || undefined,
       expertiseIds: normalizeExpertiseIds(form.value.expertiseIds),
       price: Number.isFinite(price) ? price : undefined,
       bio: form.value.bio.trim() || undefined
     })
-    form.value = { name: '', price: '', bio: '', expertiseIds: [] }
+    form.value = { name: '', userEmail: '', password: '', price: '', bio: '', expertiseIds: [] }
     nameFocused.value = false
     nameLimitError.value = ''
     bioFocused.value = false
@@ -320,8 +333,10 @@ async function onCreate() {
     closeExpertisePicker()
     await loadSpecialists()
     success.value = 'Specialist created successfully.'
+    showAlertModal({ type: 'success', message: success.value })
   } catch (e) {
     error.value = e?.message || 'Failed to create specialist'
+    showAlertModal({ type: 'error', message: error.value })
   } finally {
     creating.value = false
   }
@@ -363,35 +378,41 @@ async function onSaveEdit() {
 
   if (!editForm.value.id) {
     error.value = 'Missing specialist ID.'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
   if (!editForm.value.name.trim()) {
     error.value = 'Please enter a name.'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
   if (!editForm.value.expertiseIds.length) {
     error.value = 'Please select at least one expertise item.'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
 
   updateLoading.value = true
   try {
     const price = editForm.value.price === '' ? undefined : Number(editForm.value.price)
-    await api.adminUpdateSpecialist(editForm.value.id, {
+    const updated = await api.adminUpdateSpecialist(editForm.value.id, {
       name: editForm.value.name.trim(),
       expertiseIds: normalizeExpertiseIds(editForm.value.expertiseIds),
       price: Number.isFinite(price) ? price : undefined,
       bio: editForm.value.bio.trim() || undefined
     })
+    void updated
     if (editForm.value.status !== editOriginalStatus.value) {
-      await api.adminSetSpecialistStatus(editForm.value.id, { status: editForm.value.status })
+      const statusUpdated = await api.adminSetSpecialistStatus(editForm.value.id, { status: editForm.value.status })
+      void statusUpdated
     }
 
     await loadSpecialists()
     success.value = `Specialist ${editForm.value.id} updated successfully.`
-    closeEdit()
+    showAlertModal({ type: 'success', message: success.value, onClose: () => closeEdit() })
   } catch (e) {
     error.value = e?.message || 'Failed to update specialist'
+    showAlertModal({ type: 'error', message: error.value })
   } finally {
     updateLoading.value = false
   }
@@ -401,6 +422,7 @@ async function onDelete(row) {
   const specialistId = row?.id != null ? String(row.id) : ''
   if (!specialistId) {
     error.value = 'This specialist is missing an ID and cannot be deleted.'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
 
@@ -412,7 +434,19 @@ async function onDelete(row) {
   deletingId.value = specialistId
 
   try {
-    error.value = `Delete endpoint is not available yet for specialist ${specialistId}.`
+    await api.adminDeleteSpecialist(specialistId)
+    await loadSpecialists()
+    success.value = `Specialist ${specialistId} deleted successfully.`
+    showAlertModal({ type: 'success', message: success.value })
+    if (editOpen.value && editForm.value.id === specialistId) {
+      closeEdit()
+    }
+    if (!page.value?.items?.length) {
+      searchQuery.value = ''
+    }
+  } catch (e) {
+    error.value = e?.message || `Failed to delete specialist ${specialistId}.`
+    showAlertModal({ type: 'error', message: error.value })
   } finally {
     deletingId.value = ''
   }
@@ -429,65 +463,65 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => form.value.name,
-  (val) => {
-    if (val.length > NAME_MAX) {
-      form.value.name = val.slice(0, NAME_MAX)
-      nameLimitError.value = `Maximum ${NAME_MAX} characters allowed.`
-      return
-    }
+    () => form.value.name,
+    (val) => {
+      if (val.length > NAME_MAX) {
+        form.value.name = val.slice(0, NAME_MAX)
+        nameLimitError.value = `Maximum ${NAME_MAX} characters allowed.`
+        return
+      }
 
-    if (val.length < NAME_MAX) {
-      nameLimitError.value = ''
+      if (val.length < NAME_MAX) {
+        nameLimitError.value = ''
+      }
     }
-  }
 )
 
 watch(
-  () => form.value.bio,
-  (val) => {
-    const wordCount = countWords(val)
-    if (wordCount > BIO_MAX_WORDS) {
-      form.value.bio = trimToWordLimit(val, BIO_MAX_WORDS)
-      bioLimitError.value = `Maximum ${BIO_MAX_WORDS} words allowed.`
-      return
-    }
+    () => form.value.bio,
+    (val) => {
+      const wordCount = countWords(val)
+      if (wordCount > BIO_MAX_WORDS) {
+        form.value.bio = trimToWordLimit(val, BIO_MAX_WORDS)
+        bioLimitError.value = `Maximum ${BIO_MAX_WORDS} words allowed.`
+        return
+      }
 
-    if (wordCount < BIO_MAX_WORDS) {
-      bioLimitError.value = ''
+      if (wordCount < BIO_MAX_WORDS) {
+        bioLimitError.value = ''
+      }
     }
-  }
 )
 
 watch(
-  () => editForm.value.name,
-  (val) => {
-    if (val.length > NAME_MAX) {
-      editForm.value.name = val.slice(0, NAME_MAX)
-      editNameLimitError.value = `Maximum ${NAME_MAX} characters allowed.`
-      return
-    }
+    () => editForm.value.name,
+    (val) => {
+      if (val.length > NAME_MAX) {
+        editForm.value.name = val.slice(0, NAME_MAX)
+        editNameLimitError.value = `Maximum ${NAME_MAX} characters allowed.`
+        return
+      }
 
-    if (val.length < NAME_MAX) {
-      editNameLimitError.value = ''
+      if (val.length < NAME_MAX) {
+        editNameLimitError.value = ''
+      }
     }
-  }
 )
 
 watch(
-  () => editForm.value.bio,
-  (val) => {
-    const wordCount = countWords(val)
-    if (wordCount > BIO_MAX_WORDS) {
-      editForm.value.bio = trimToWordLimit(val, BIO_MAX_WORDS)
-      editBioLimitError.value = `Maximum ${BIO_MAX_WORDS} words allowed.`
-      return
-    }
+    () => editForm.value.bio,
+    (val) => {
+      const wordCount = countWords(val)
+      if (wordCount > BIO_MAX_WORDS) {
+        editForm.value.bio = trimToWordLimit(val, BIO_MAX_WORDS)
+        editBioLimitError.value = `Maximum ${BIO_MAX_WORDS} words allowed.`
+        return
+      }
 
-    if (wordCount < BIO_MAX_WORDS) {
-      editBioLimitError.value = ''
+      if (wordCount < BIO_MAX_WORDS) {
+        editBioLimitError.value = ''
+      }
     }
-  }
 )
 </script>
 
@@ -500,9 +534,6 @@ watch(
       </p>
     </header>
 
-    <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
-    <div v-if="success" class="banner banner--success" role="status">{{ success }}</div>
-
     <section class="calc-card create-card">
       <h2 class="card-title">Create Specialist</h2>
 
@@ -510,21 +541,21 @@ watch(
         <label class="field">
           <span class="label">Name</span>
           <input
-            v-model="form.name"
-            class="input"
-            type="text"
-            placeholder="Enter specialist name"
-            maxlength="50"
-            @focus="onNameFocus"
-            @blur="onNameBlur"
+              v-model="form.name"
+              class="input"
+              type="text"
+              placeholder="Enter specialist name"
+              maxlength="50"
+              @focus="onNameFocus"
+              @blur="onNameBlur"
           />
 
           <div
-            v-if="showNameHelper"
-            class="limit-helper"
-            :class="{ 'limit-helper--error': nameLimitError }"
-            role="status"
-            aria-live="polite"
+              v-if="showNameHelper"
+              class="limit-helper"
+              :class="{ 'limit-helper--error': nameLimitError }"
+              role="status"
+              aria-live="polite"
           >
             <p class="limit-helper__text">{{ nameLimitError || `Maximum ${NAME_MAX} characters` }}</p>
             <p class="limit-helper__count">{{ form.name.length }}/{{ NAME_MAX }}</p>
@@ -532,34 +563,54 @@ watch(
         </label>
 
         <label class="field">
+          <span class="label">User Email</span>
+          <input
+              v-model.trim="form.userEmail"
+              class="input"
+              type="email"
+              placeholder="Enter user email"
+          />
+        </label>
+
+        <label class="field">
+          <span class="label">Initial Password (optional)</span>
+          <input
+              v-model="form.password"
+              class="input"
+              type="password"
+              placeholder="Required only if this email is not registered"
+          />
+        </label>
+
+        <label class="field">
           <span class="label">Default Price (optional)</span>
           <input
-            v-model="form.price"
-            class="input"
-            type="number"
-            min="0"
-            step="1"
-            placeholder="Enter price"
+              v-model="form.price"
+              class="input"
+              type="number"
+              min="0"
+              step="1"
+              placeholder="Enter price"
           />
         </label>
 
         <label class="field field--full">
           <span class="label">Bio (optional)</span>
           <textarea
-            v-model="form.bio"
-            class="input input--area"
-            rows="3"
-            placeholder="Add specialist bio"
-            @focus="onBioFocus"
-            @blur="onBioBlur"
+              v-model="form.bio"
+              class="input input--area"
+              rows="3"
+              placeholder="Add specialist bio"
+              @focus="onBioFocus"
+              @blur="onBioBlur"
           />
 
           <div
-            v-if="showBioHelper"
-            class="limit-helper"
-            :class="{ 'limit-helper--error': bioLimitError }"
-            role="status"
-            aria-live="polite"
+              v-if="showBioHelper"
+              class="limit-helper"
+              :class="{ 'limit-helper--error': bioLimitError }"
+              role="status"
+              aria-live="polite"
           >
             <p class="limit-helper__text">{{ bioLimitError || `Maximum ${BIO_MAX_WORDS} words` }}</p>
             <p class="limit-helper__count">{{ bioWordCount }}/{{ BIO_MAX_WORDS }} words</p>
@@ -570,10 +621,10 @@ watch(
       <div ref="expertiseFieldRef" class="field expertise-field field--full">
         <span class="label">Expertise</span>
         <button
-          type="button"
-          class="multi-trigger"
-          :class="{ 'multi-trigger--open': expertiseOpen }"
-          @click="toggleExpertisePicker"
+            type="button"
+            class="multi-trigger"
+            :class="{ 'multi-trigger--open': expertiseOpen }"
+            @click="toggleExpertisePicker"
         >
           <span>{{ expertisePlaceholder }}</span>
           <span class="multi-trigger__arrow">{{ expertiseOpen ? '^' : 'v' }}</span>
@@ -581,20 +632,20 @@ watch(
 
         <div v-if="expertiseOpen" class="multi-panel">
           <input
-            v-model.trim="expertiseSearch"
-            class="input input--search"
-            type="text"
-            placeholder="Search expertise"
+              v-model.trim="expertiseSearch"
+              class="input input--search"
+              type="text"
+              placeholder="Search expertise"
           />
 
           <div class="multi-options">
             <button
-              v-for="item in filteredExpertiseOptions"
-              :key="item.id"
-              type="button"
-              class="multi-option"
-              :class="{ 'multi-option--active': form.expertiseIds.includes(String(item.id)) }"
-              @click="toggleExpertise(item.id)"
+                v-for="item in filteredExpertiseOptions"
+                :key="item.id"
+                type="button"
+                class="multi-option"
+                :class="{ 'multi-option--active': form.expertiseIds.includes(String(item.id)) }"
+                @click="toggleExpertise(item.id)"
             >
               <span>{{ item.name }}</span>
               <span class="multi-option__state">
@@ -610,11 +661,11 @@ watch(
 
         <div v-if="selectedExpertise.length" class="selected-chips">
           <button
-            v-for="item in selectedExpertise"
-            :key="item.id"
-            type="button"
-            class="selected-chip"
-            @click="removeExpertise(item.id)"
+              v-for="item in selectedExpertise"
+              :key="item.id"
+              type="button"
+              class="selected-chip"
+              @click="removeExpertise(item.id)"
           >
             <span>{{ item.name }}</span>
             <span class="selected-chip__remove">x</span>
@@ -637,11 +688,11 @@ watch(
         </div>
         <div class="toolbar-actions">
           <input
-            v-model.trim="searchQuery"
-            class="input search-input"
-            type="text"
-            placeholder="Search specialist by name"
-            aria-label="Search specialist by name"
+              v-model.trim="searchQuery"
+              class="input search-input"
+              type="text"
+              placeholder="Search specialist by name"
+              aria-label="Search specialist by name"
           />
           <button type="button" class="btn-neutral btn-refresh" :disabled="loading" @click="loadSpecialists">
             {{ loading ? 'Loading...' : 'Refresh' }}
@@ -662,58 +713,58 @@ watch(
       <div v-else class="table-wrap">
         <table class="table">
           <thead>
-            <tr>
-              <th scope="col" class="th-id">ID</th>
-              <th scope="col">Name</th>
-              <th scope="col">Price</th>
-              <th scope="col">Expertise</th>
-              <th scope="col">Status</th>
-              <th scope="col" class="th-actions">Actions</th>
-            </tr>
+          <tr>
+            <th scope="col" class="th-id">ID</th>
+            <th scope="col">Name</th>
+            <th scope="col">Price</th>
+            <th scope="col">Expertise</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="th-actions">Actions</th>
+          </tr>
           </thead>
 
           <tbody>
-            <tr v-for="s in filteredSpecialists" :key="s.id">
-              <td class="mono weak">{{ s.id ?? '--' }}</td>
-              <td class="name-cell">{{ s.name ?? '--' }}</td>
-              <td>{{ formatPrice(s.price) }}</td>
-              <td>
-                <div v-if="specialistExpertiseNames(s).length" class="expertise-summary">
+          <tr v-for="s in filteredSpecialists" :key="s.id">
+            <td class="mono weak">{{ s.id ?? '--' }}</td>
+            <td class="name-cell">{{ s.name ?? '--' }}</td>
+            <td>{{ formatPrice(s.price) }}</td>
+            <td>
+              <div v-if="specialistExpertiseNames(s).length" class="expertise-summary">
                   <span
-                    v-for="name in specialistExpertiseNames(s).slice(0, 2)"
-                    :key="name"
-                    class="summary-chip"
+                      v-for="name in specialistExpertiseNames(s).slice(0, 2)"
+                      :key="name"
+                      class="summary-chip"
                   >
                     {{ name }}
                   </span>
-                  <span
+                <span
                     v-if="specialistExpertiseNames(s).length > 2"
                     class="summary-chip summary-chip--more"
-                  >
+                >
                     +{{ specialistExpertiseNames(s).length - 2 }}
                   </span>
-                </div>
-                <span v-else class="muted">--</span>
-              </td>
-              <td>
-                <span :class="specialistStatusClass(s)">{{ specialistStatus(s) }}</span>
-              </td>
-              <td>
-                <div class="row-actions">
-                  <button type="button" class="action-btn" :disabled="updateLoading || deletingId === `${s.id}`" @click="openEdit(s)">
-                    Edit
-                  </button>
-                  <button
+              </div>
+              <span v-else class="muted">--</span>
+            </td>
+            <td>
+              <span :class="specialistStatusClass(s)">{{ specialistStatus(s) }}</span>
+            </td>
+            <td>
+              <div class="row-actions">
+                <button type="button" class="action-btn" :disabled="updateLoading || deletingId === `${s.id}`" @click="openEdit(s)">
+                  Edit
+                </button>
+                <button
                     type="button"
                     class="action-btn action-btn--danger"
                     :disabled="updateLoading || deletingId === `${s.id}`"
                     @click="onDelete(s)"
-                  >
-                    {{ deletingId === `${s.id}` ? 'Deleting...' : 'Delete' }}
-                  </button>
-                </div>
-              </td>
-            </tr>
+                >
+                  {{ deletingId === `${s.id}` ? 'Deleting...' : 'Delete' }}
+                </button>
+              </div>
+            </td>
+          </tr>
           </tbody>
         </table>
       </div>
@@ -736,21 +787,21 @@ watch(
           <label class="field">
             <span class="label">Name</span>
             <input
-              v-model="editForm.name"
-              class="input"
-              type="text"
-              placeholder="Enter specialist name"
-              maxlength="50"
-              @focus="onEditNameFocus"
-              @blur="onEditNameBlur"
+                v-model="editForm.name"
+                class="input"
+                type="text"
+                placeholder="Enter specialist name"
+                maxlength="50"
+                @focus="onEditNameFocus"
+                @blur="onEditNameBlur"
             />
 
             <div
-              v-if="showEditNameHelper"
-              class="limit-helper"
-              :class="{ 'limit-helper--error': editNameLimitError }"
-              role="status"
-              aria-live="polite"
+                v-if="showEditNameHelper"
+                class="limit-helper"
+                :class="{ 'limit-helper--error': editNameLimitError }"
+                role="status"
+                aria-live="polite"
             >
               <p class="limit-helper__text">{{ editNameLimitError || `Maximum ${NAME_MAX} characters` }}</p>
               <p class="limit-helper__count">{{ editForm.name.length }}/{{ NAME_MAX }}</p>
@@ -760,32 +811,32 @@ watch(
           <label class="field">
             <span class="label">Default Price</span>
             <input
-              v-model="editForm.price"
-              class="input"
-              type="number"
-              min="0"
-              step="1"
-              placeholder="Enter price"
+                v-model="editForm.price"
+                class="input"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="Enter price"
             />
           </label>
 
           <label class="field field--full">
             <span class="label">Bio</span>
             <textarea
-              v-model="editForm.bio"
-              class="input input--area"
-              rows="3"
-              placeholder="Update specialist bio"
-              @focus="onEditBioFocus"
-              @blur="onEditBioBlur"
+                v-model="editForm.bio"
+                class="input input--area"
+                rows="3"
+                placeholder="Update specialist bio"
+                @focus="onEditBioFocus"
+                @blur="onEditBioBlur"
             />
 
             <div
-              v-if="showEditBioHelper"
-              class="limit-helper"
-              :class="{ 'limit-helper--error': editBioLimitError }"
-              role="status"
-              aria-live="polite"
+                v-if="showEditBioHelper"
+                class="limit-helper"
+                :class="{ 'limit-helper--error': editBioLimitError }"
+                role="status"
+                aria-live="polite"
             >
               <p class="limit-helper__text">{{ editBioLimitError || `Maximum ${BIO_MAX_WORDS} words` }}</p>
               <p class="limit-helper__count">{{ editBioWordCount }}/{{ BIO_MAX_WORDS }} words</p>
@@ -796,10 +847,10 @@ watch(
         <div ref="editExpertiseFieldRef" class="field expertise-field">
           <span class="label">Expertise</span>
           <button
-            type="button"
-            class="multi-trigger"
-            :class="{ 'multi-trigger--open': editExpertiseOpen }"
-            @click="toggleEditExpertisePicker"
+              type="button"
+              class="multi-trigger"
+              :class="{ 'multi-trigger--open': editExpertiseOpen }"
+              @click="toggleEditExpertisePicker"
           >
             <span>{{ editExpertisePlaceholder }}</span>
             <span class="multi-trigger__arrow">{{ editExpertiseOpen ? '^' : 'v' }}</span>
@@ -807,20 +858,20 @@ watch(
 
           <div v-if="editExpertiseOpen" class="multi-panel">
             <input
-              v-model.trim="editExpertiseSearch"
-              class="input input--search"
-              type="text"
-              placeholder="Search expertise"
+                v-model.trim="editExpertiseSearch"
+                class="input input--search"
+                type="text"
+                placeholder="Search expertise"
             />
 
             <div class="multi-options">
               <button
-                v-for="item in filteredEditExpertiseOptions"
-                :key="item.id"
-                type="button"
-                class="multi-option"
-                :class="{ 'multi-option--active': editForm.expertiseIds.includes(String(item.id)) }"
-                @click="toggleEditExpertise(item.id)"
+                  v-for="item in filteredEditExpertiseOptions"
+                  :key="item.id"
+                  type="button"
+                  class="multi-option"
+                  :class="{ 'multi-option--active': editForm.expertiseIds.includes(String(item.id)) }"
+                  @click="toggleEditExpertise(item.id)"
               >
                 <span>{{ item.name }}</span>
                 <span class="multi-option__state">
@@ -836,11 +887,11 @@ watch(
 
           <div v-if="selectedEditExpertise.length" class="selected-chips">
             <button
-              v-for="item in selectedEditExpertise"
-              :key="item.id"
-              type="button"
-              class="selected-chip"
-              @click="removeEditExpertise(item.id)"
+                v-for="item in selectedEditExpertise"
+                :key="item.id"
+                type="button"
+                class="selected-chip"
+                @click="removeEditExpertise(item.id)"
             >
               <span>{{ item.name }}</span>
               <span class="selected-chip__remove">x</span>
@@ -852,18 +903,18 @@ watch(
           <span class="label">Status</span>
           <div class="option-row">
             <button
-              type="button"
-              class="option-btn option-btn--positive"
-              :class="{ 'option-btn--active-positive': editForm.status === 'Active' }"
-              @click="editForm.status = 'Active'"
+                type="button"
+                class="option-btn option-btn--positive"
+                :class="{ 'option-btn--active-positive': editForm.status === 'Active' }"
+                @click="editForm.status = 'Active'"
             >
               Active
             </button>
             <button
-              type="button"
-              class="option-btn option-btn--negative"
-              :class="{ 'option-btn--active-negative': editForm.status === 'Inactive' }"
-              @click="editForm.status = 'Inactive'"
+                type="button"
+                class="option-btn option-btn--negative"
+                :class="{ 'option-btn--active-negative': editForm.status === 'Inactive' }"
+                @click="editForm.status = 'Inactive'"
             >
               Inactive
             </button>
@@ -875,10 +926,10 @@ watch(
             Cancel
           </button>
           <button
-            type="button"
-            class="btn-primary btn-primary--fit modal-save"
-            :disabled="updateLoading"
-            @click="onSaveEdit"
+              type="button"
+              class="btn-primary btn-primary--fit modal-save"
+              :disabled="updateLoading"
+              @click="onSaveEdit"
           >
             {{ updateLoading ? 'Saving...' : 'Save Changes' }}
           </button>

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
+import { showAlertModal } from '@/ui/alertModal'
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -146,6 +147,7 @@ async function loadSpecialists() {
   } catch (e) {
     specialistLoadError.value = e?.message || 'Failed to load specialists'
     specialists.value = []
+    showAlertModal({ type: 'error', message: specialistLoadError.value })
   } finally {
     specialistsLoading.value = false
   }
@@ -170,6 +172,7 @@ async function loadSlots(options = {}) {
     error.value = 'Search start time must be earlier than end time.'
     slots.value = []
     searchedOnce.value = true
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
 
@@ -180,11 +183,13 @@ async function loadSlots(options = {}) {
     searchedOnce.value = true
     if (announceSuccess) {
       success.value = `Loaded ${slotCountLabel.value}.`
+      showAlertModal({ type: 'success', message: success.value })
     }
   } catch (e) {
     error.value = e?.message || 'Failed to load slots'
     slots.value = []
     searchedOnce.value = true
+    showAlertModal({ type: 'error', message: error.value })
   } finally {
     searchLoading.value = false
   }
@@ -244,14 +249,17 @@ async function onCreate() {
 
   if (!createForm.value.specialistId) {
     error.value = 'Please select a specialist for the new slot.'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
   if (!createForm.value.date || !createForm.value.start || !createForm.value.end) {
     error.value = 'Please complete date, start time, and end time.'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
   if (!isValidTimeRange(createForm.value.start, createForm.value.end)) {
     error.value = 'Create slot start time must be earlier than end time.'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
 
@@ -268,9 +276,11 @@ async function onCreate() {
     await loadSlots({ preserveMessages: true })
     if (!error.value) {
       success.value = `Slot ${slotId(created) || 'created'} created successfully.`
+      showAlertModal({ type: 'success', message: success.value })
     }
   } catch (e) {
     error.value = e?.message || 'Failed to create slot'
+    showAlertModal({ type: 'error', message: error.value })
   } finally {
     createLoading.value = false
   }
@@ -281,14 +291,17 @@ async function onUpdate() {
 
   if (!editForm.value.id) {
     error.value = 'Missing slot ID.'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
   if (!editForm.value.date || !editForm.value.start || !editForm.value.end) {
     error.value = 'Please complete date, start time, and end time.'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
   if (!isValidTimeRange(editForm.value.start, editForm.value.end)) {
     error.value = 'Edit slot start time must be earlier than end time.'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
 
@@ -303,10 +316,12 @@ async function onUpdate() {
     await loadSlots({ preserveMessages: true })
     if (!error.value) {
       success.value = `Slot ${editForm.value.id} updated successfully.`
+      showAlertModal({ type: 'success', message: success.value })
       closeEdit()
     }
   } catch (e) {
     error.value = e?.message || 'Failed to update slot'
+    showAlertModal({ type: 'error', message: error.value })
   } finally {
     updateLoading.value = false
   }
@@ -316,6 +331,7 @@ async function onDelete(row) {
   const id = slotId(row)
   if (!id) {
     error.value = 'This slot is missing an ID and cannot be deleted.'
+    showAlertModal({ type: 'error', message: error.value })
     return
   }
 
@@ -329,9 +345,11 @@ async function onDelete(row) {
     await loadSlots({ preserveMessages: true })
     if (!error.value) {
       success.value = `Slot ${id} deleted successfully.`
+      showAlertModal({ type: 'success', message: success.value })
     }
   } catch (e) {
     error.value = e?.message || 'Failed to delete slot'
+    showAlertModal({ type: 'error', message: error.value })
   } finally {
     deletingId.value = ''
   }
@@ -414,9 +432,7 @@ onMounted(async () => {
           </label>
         </div>
 
-        <div v-if="specialistLoadError" class="banner banner--error banner--inline" role="alert">
-          {{ specialistLoadError }}
-        </div>
+        <!-- banner 弃用：错误改为弹窗提示（见 loadSpecialists） -->
 
         <div class="button-row">
           <button type="button" class="btn-primary btn-primary--fit" :disabled="searchLoading" @click="onSearch">
@@ -487,9 +503,6 @@ onMounted(async () => {
         </button>
       </section>
     </div>
-
-    <div v-if="success" class="banner banner--success" role="status">{{ success }}</div>
-    <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
 
     <section class="calc-card list-card">
       <div class="list-toolbar">
