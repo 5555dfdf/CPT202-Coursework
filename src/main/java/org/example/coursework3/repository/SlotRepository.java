@@ -13,4 +13,6 @@ public interface SlotRepository extends JpaRepository<Slot, String> {
     List<Slot> findBySpecialistId(String id);
 
     Slot getById(String id);
+
+    Slot getSlotById(String id);
 }

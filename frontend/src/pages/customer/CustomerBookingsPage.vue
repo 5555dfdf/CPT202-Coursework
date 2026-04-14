@@ -125,7 +125,7 @@ watch(status, () => onSearch())
         <div class="main">
           <div class="booking-no">Booking #{{ idx + 1 }}</div>
           <div class="muted small">Schedule: {{ formatTime(b.time ?? b.startTime) }}</div>
-          <div class="muted small">Specialist: {{ b.specialistName ?? 'Assigned specialist' }}</div>
+          <div class="muted small">Specialist: {{ b.specialistName ?? b.specialistId ?? '—' }}</div>
           <div class="status" :class="statusClass(b.status)">{{ b.status ?? '—' }}</div>
         </div>
         <RouterLink class="link" :to="{ name: 'customer.bookingDetail', params: { id: b.id } }">

@@ -7,6 +7,7 @@ import org.example.coursework3.dto.response.CreateBookingResult;
 import org.example.coursework3.result.Result;
 import org.example.coursework3.service.AuthService;
 import org.example.coursework3.service.CustomerBookingService;
+import org.example.coursework3.vo.SingleBookingVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -41,6 +42,14 @@ public class BookingController {
         String userId = authService.getUserIdByAuth(authHeader);
         BookingPageResult pageResult = bookingService.getMyBookings(userId, status, page, pageSize, from, to);
         return Result.success(pageResult);
+    }
+
+    @GetMapping("/{id}")
+    public Result<SingleBookingVo> getSingleBookingInfo(@RequestHeader("Authorization") String authHeader, @PathVariable String id){
+        if (!authService.verifyAsCustomer(authHeader)) {
+            return Result.error("ERROR", "请以顾客身份查看");
+        }
+        return Result.success(bookingService.getSingleBookingInfo(id));
     }
 
 

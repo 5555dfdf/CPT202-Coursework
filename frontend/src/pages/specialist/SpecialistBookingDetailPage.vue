@@ -85,7 +85,6 @@ onUnmounted(() => {
   <section class="page">
     <header class="page__header">
       <h1>Booking Details (Specialist)</h1>
-      <p class="muted mono">bookingId: {{ id }}</p>
     </header>
 
     <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
@@ -101,8 +100,8 @@ onUnmounted(() => {
           <dd>{{ booking.time ?? booking.startTime ?? '—' }}</dd>
           <dt>Customer</dt>
           <dd>{{ booking.customerName ?? booking.customerId ?? '—' }}</dd>
-          <dt>Slot</dt>
-          <dd class="mono">{{ booking.slotId ?? '—' }}</dd>
+          <dt>Duration</dt>
+          <dd>{{ booking.duration ?? booking.slot ?? booking.slotId ?? '—' }}</dd>
         </dl>
       </div>
 

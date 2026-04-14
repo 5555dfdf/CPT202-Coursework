@@ -70,7 +70,6 @@ async function onReschedule() {
   <section class="page">
     <header class="page__header">
       <h1>Booking Details</h1>
-      <p class="muted mono">bookingId: {{ id }}</p>
     </header>
 
     <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
@@ -85,9 +84,9 @@ async function onReschedule() {
           <dt>Time</dt>
           <dd>{{ booking.time ?? booking.startTime ?? '—' }}</dd>
           <dt>Specialist</dt>
-          <dd class="mono">{{ booking.specialistId ?? '—' }}</dd>
-          <dt>Slot</dt>
-          <dd class="mono">{{ booking.slotId ?? '—' }}</dd>
+          <dd>{{ booking.specialistName ?? booking.specialistId ?? '—' }}</dd>
+          <dt>Duration</dt>
+          <dd>{{ booking.duration ?? booking.slot ?? booking.slotId ?? '—' }}</dd>
           <dt>Note</dt>
           <dd>{{ booking.note ?? '—' }}</dd>
         </dl>

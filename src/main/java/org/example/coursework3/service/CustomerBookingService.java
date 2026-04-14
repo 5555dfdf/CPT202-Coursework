@@ -13,6 +13,7 @@ import org.example.coursework3.repository.BookingRepository;
 import org.example.coursework3.repository.SlotRepository;
 import org.example.coursework3.repository.UserRepository;
 import org.example.coursework3.vo.MyBookingVo;
+import org.example.coursework3.vo.SingleBookingVo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -87,7 +88,9 @@ public class CustomerBookingService {
                     if (toTime != null && startTime.isAfter(toTime)) {
                         return;
                     }
-                    allItems.add(MyBookingVo.fromBooking(booking, slot));
+                    User specialist = userRepository.findById(booking.getSpecialistId());
+                    String specialistName = specialist != null ? specialist.getName() : booking.getSpecialistId();
+                    allItems.add(MyBookingVo.fromBooking(booking, slot, specialistName));
                 });
 
         int total = allItems.size();
@@ -113,6 +116,15 @@ public class CustomerBookingService {
             throw new MsgException("日期格式错误：" + value);
         }
     }
+
+    public SingleBookingVo getSingleBookingInfo(String bookingId){
+        Booking booking = bookingRepository.getBookingById(bookingId);
+        Slot slot = slotRepository.getSlotById(booking.getSlotId());
+        User specialist = userRepository.findById(booking.getSpecialistId());
+        String specialistName = specialist != null ? specialist.getName() : booking.getSpecialistId();
+        return SingleBookingVo.fromBooking(booking, slot, specialistName);
+    }
+
 
 //    @Transactional
 //    public void cancelBooking(String userId, String bookingId) {
