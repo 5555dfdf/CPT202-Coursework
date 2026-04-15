@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { api } from '@/api/client'
 import { showAlertModal } from '@/ui/alertModal'
 
@@ -14,8 +14,8 @@ const quote = ref(null)
 const quoteResults = ref([])
 const resultMode = ref('idle')
 const history = ref([])
-const specialistDirectory = ref([])
-const specialistDirectoryLoaded = ref(false)
+const specialists = ref([])
+const specialistsLoading = ref(false)
 
 const durationOptions = [30, 45, 60, 90]
 const sessionTypeOptions = [
@@ -132,59 +132,17 @@ function resetResults() {
   resultMode.value = 'idle'
 }
 
-async function ensureSpecialistDirectory() {
-  if (specialistDirectoryLoaded.value) return specialistDirectory.value
-  const page = await api.listSpecialists({ pageSize: 100 })
-  specialistDirectory.value = Array.isArray(page?.items) ? page.items : []
-  specialistDirectoryLoaded.value = true
-  return specialistDirectory.value
-}
-
-async function resolveSpecialistReference(inputValue) {
-  const query = String(inputValue || '').trim()
-  if (!query) return { specialistId: '', specialistName: '' }
-
+async function loadSpecialists() {
+  specialistsLoading.value = true
   try {
-    const items = await ensureSpecialistDirectory()
-    const normalizedQuery = query.toLowerCase()
-    const exactIdMatch = items.find((row) => String(row?.id ?? '').trim().toLowerCase() === normalizedQuery)
-    if (exactIdMatch) {
-      return {
-        specialistId: String(exactIdMatch.id),
-        specialistName: String(exactIdMatch.name ?? '').trim()
-      }
-    }
-
-    const exactNameMatches = items.filter(
-      (row) => String(row?.name ?? '').trim().toLowerCase() === normalizedQuery
-    )
-    if (exactNameMatches.length === 1) {
-      return {
-        specialistId: String(exactNameMatches[0].id),
-        specialistName: String(exactNameMatches[0].name ?? '').trim()
-      }
-    }
-
-    const partialNameMatches = items.filter((row) =>
-      String(row?.name ?? '').trim().toLowerCase().includes(normalizedQuery)
-    )
-    if (partialNameMatches.length === 1) {
-      return {
-        specialistId: String(partialNameMatches[0].id),
-        specialistName: String(partialNameMatches[0].name ?? '').trim()
-      }
-    }
-
-    if (exactNameMatches.length > 1 || partialNameMatches.length > 1) {
-      throw new Error('Multiple specialists matched that name. Please use the specialist ID.')
-    }
+    const page = await api.listSpecialists({ pageSize: 100 })
+    specialists.value = Array.isArray(page?.items) ? page.items : []
   } catch (e) {
-    if (e?.message === 'Multiple specialists matched that name. Please use the specialist ID.') {
-      throw e
-    }
+    showAlertModal({ type: 'error', message: e?.message || 'Failed to load specialists' })
+    specialists.value = []
+  } finally {
+    specialistsLoading.value = false
   }
-
-  return { specialistId: query, specialistName: '' }
 }
 
 function createQuoteRecord(source, fallback) {
@@ -303,8 +261,8 @@ async function onQuote() {
   error.value = ''
   resetResults()
 
-  if (!specialistId.value.trim()) {
-    error.value = 'Please enter a specialist name or ID'
+  if (!specialistId.value) {
+    error.value = 'Please select a specialist'
     showAlertModal({ type: 'error', message: error.value })
     return
   }
@@ -312,19 +270,21 @@ async function onQuote() {
   loading.value = true
 
   try {
-    const resolved = await resolveSpecialistReference(specialistId.value)
-    resolvedSpecialistId.value = resolved.specialistId
-    resolvedSpecialistName.value = resolved.specialistName
+    const selectedSpecialist = specialists.value.find(s => s.id === specialistId.value)
+    const specialistName = selectedSpecialist?.name || ''
+    
+    resolvedSpecialistId.value = specialistId.value
+    resolvedSpecialistName.value = specialistName
 
     if (hasDuration.value && hasType.value) {
       const response = await api.quotePricing({
-        specialistId: resolved.specialistId,
+        specialistId: specialistId.value,
         duration: Number(duration.value),
         type: String(type.value).trim().toLowerCase()
       })
       const records = normalizeQuoteResponse(response, {
-        specialistId: resolved.specialistId,
-        specialistName: resolved.specialistName,
+        specialistId: specialistId.value,
+        specialistName: specialistName,
         duration: Number(duration.value),
         type: String(type.value).trim().toLowerCase()
       })
@@ -354,13 +314,13 @@ async function onQuote() {
     const settled = await Promise.allSettled(
       combinations.map((combo) =>
         api.quotePricing({
-          specialistId: resolved.specialistId,
+          specialistId: specialistId.value,
           duration: combo.duration,
           type: combo.type
         }).then((response) =>
           normalizeQuoteResponse(response, {
-            specialistId: resolved.specialistId,
-            specialistName: resolved.specialistName,
+            specialistId: specialistId.value,
+            specialistName: specialistName,
             duration: combo.duration,
             type: combo.type
           })
@@ -373,8 +333,7 @@ async function onQuote() {
 
     if (!normalizedResults.length) {
       const firstFailure = settled.find((row) => row.status === 'rejected')
-      error.value =
-        firstFailure?.reason?.message || 'No quote combinations available for this specialist'
+      error.value = firstFailure?.reason?.message || 'No quote combinations available for this specialist'
       resultMode.value = 'list'
       showAlertModal({ type: 'warn', message: error.value })
       return
@@ -390,6 +349,10 @@ async function onQuote() {
     loading.value = false
   }
 }
+
+onMounted(async () => {
+  await loadSpecialists()
+})
 </script>
 
 <template>
@@ -413,11 +376,12 @@ async function onQuote() {
         <div class="setup-card__body">
           <label class="field">
             <span class="label">Specialist</span>
-            <input
-              v-model="specialistId"
-              class="input"
-              placeholder="Enter specialist ID or name (e.g. sp-1)"
-            />
+            <select v-model="specialistId" class="input input--select" :disabled="specialistsLoading">
+              <option value="">Select a specialist</option>
+              <option v-for="row in specialists" :key="row.id" :value="row.id">
+                {{ row.name || row.id }} ({{ row.id }})
+              </option>
+            </select>
           </label>
 
           <div class="field">
@@ -728,6 +692,16 @@ async function onQuote() {
   border: 1px solid #d8d1cb;
   background: #f8f5f2;
   color: #111827;
+}
+
+.input--select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
 }
 
 .option-row {
