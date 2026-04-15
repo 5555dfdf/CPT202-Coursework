@@ -1,9 +1,12 @@
 package org.example.coursework3.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.coursework3.entity.Specialist;
+import org.example.coursework3.entity.SpecialistStatus;
 import org.example.coursework3.exception.MsgException;
 import org.example.coursework3.entity.Role;
 import org.example.coursework3.entity.User;
+import org.example.coursework3.repository.SpecialistsRepository;
 import org.example.coursework3.repository.UserRepository;
 import org.example.coursework3.dto.response.AuthResult;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -16,6 +19,7 @@ public class AuthService {
 
     private final StringRedisTemplate redisTemplate;
     private final UserRepository userRepository;
+    private final SpecialistsRepository specialistsRepository;
 
     public boolean verifyAsAdmin(String authHeader){
 //        String token = authHeader.replace("Bearer ", "");
@@ -102,7 +106,12 @@ public class AuthService {
         if (!passwordHash.equals(password)) {
             throw new MsgException("密码不正确");
         }
-
+        if (Role.Specialist == user.getRole()){
+            Specialist specialist = specialistsRepository.getByUserId(user.getId());
+            if (specialist.getStatus()== SpecialistStatus.Inactive){
+                throw new MsgException("当前专家账号被禁用");
+            }
+        }
         return user;
     }
 
