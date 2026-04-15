@@ -9,8 +9,6 @@ import org.example.coursework3.entity.*;
 import org.example.coursework3.exception.MsgException;
 import org.example.coursework3.repository.*;
 import org.example.coursework3.vo.AdminSlotVo;
-import org.example.coursework3.vo.MyBookingVo;
-import org.hibernate.grammars.hql.HqlParser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
