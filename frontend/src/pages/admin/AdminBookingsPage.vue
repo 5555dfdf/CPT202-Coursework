@@ -3,7 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { showAlertModal } from '@/ui/alertModal'
 
-const page = ref({ items: [], total: 0, page: 1, pageSize: 10 })
+const PAGE_SIZE = 10
+const page = ref({ items: [], total: 0, page: 1, pageSize: PAGE_SIZE })
 const loading = ref(false)
 const error = ref('')
 const missingApi = ref(false)
@@ -95,7 +96,8 @@ async function load() {
   detailErrorMap.value = {}
 
   try {
-    page.value = await api.adminListBookings({ pageSize: 100 })
+    const current = Number(page.value?.page) || 1
+    page.value = await api.adminListBookings({ page: current, pageSize: PAGE_SIZE })
   } catch (e) {
     if (e?.status === 404) {
       missingApi.value = true
@@ -105,10 +107,31 @@ async function load() {
       error.value = e?.message || 'Failed to load bookings'
       showAlertModal({ type: 'error', message: error.value })
     }
-    page.value = { items: [], total: 0, page: 1, pageSize: 10 }
+    page.value = { items: [], total: 0, page: 1, pageSize: PAGE_SIZE }
   } finally {
     loading.value = false
   }
+}
+
+function totalPages() {
+  const total = Number(page.value?.total || 0)
+  return Math.max(1, Math.ceil(total / PAGE_SIZE))
+}
+
+async function prevPage() {
+  if (loading.value) return
+  const current = Number(page.value?.page) || 1
+  if (current <= 1) return
+  page.value = { ...page.value, page: current - 1 }
+  await load()
+}
+
+async function nextPage() {
+  if (loading.value) return
+  const current = Number(page.value?.page) || 1
+  if (current >= totalPages()) return
+  page.value = { ...page.value, page: current + 1 }
+  await load()
 }
 
 async function toggleBooking(row) {
@@ -287,6 +310,21 @@ onMounted(load)
           </div>
         </article>
       </div>
+
+      <div v-if="(page.items || []).length && !missingApi" class="pager">
+        <button type="button" class="btn-neutral" :disabled="loading || (page.page ?? 1) <= 1" @click="prevPage">
+          Prev
+        </button>
+        <span class="pager__info">Page {{ page.page }} / {{ totalPages() }} · Total {{ page.total }}</span>
+        <button
+          type="button"
+          class="btn-neutral"
+          :disabled="loading || (page.page ?? 1) >= totalPages()"
+          @click="nextPage"
+        >
+          Next
+        </button>
+      </div>
     </section>
   </section>
 </template>
@@ -421,6 +459,18 @@ onMounted(load)
   color: #374151;
   font-size: 12px;
   font-weight: 700;
+}
+
+.pager {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pager__info {
+  font-size: 13px;
+  color: #475569;
 }
 
 .state {
