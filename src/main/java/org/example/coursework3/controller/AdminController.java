@@ -1,17 +1,20 @@
 package org.example.coursework3.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.example.coursework3.dto.request.CreateSpecialistRequest;
-import org.example.coursework3.dto.request.EditSpecialistRequest;
-import org.example.coursework3.dto.request.ExpertiseRequest;
-import org.example.coursework3.dto.request.UpdateSpecialistStatusRequest;
+import org.example.coursework3.dto.request.*;
+import org.example.coursework3.dto.response.BookingPageResult;
 import org.example.coursework3.entity.Expertise;
 import org.example.coursework3.entity.Specialist;
 import org.example.coursework3.result.Result;
 import org.example.coursework3.service.AdminService;
 import org.example.coursework3.service.AuthService;
+import org.example.coursework3.service.CustomerBookingService;
+import org.example.coursework3.vo.AdminSlotVo;
+import org.example.coursework3.vo.SingleBookingVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/admin")
@@ -22,6 +25,8 @@ public class AdminController {
     private AdminService adminService;
     @Autowired
     private AuthService authService;
+    @Autowired
+    private CustomerBookingService customerBookingService;
 
     // 1. 创建专家
     @PostMapping("/specialists")
@@ -93,6 +98,66 @@ public class AdminController {
         }
         adminService.deleteExpertise(id);
         return Result.success("专长删除成功");
+    }
+
+    @GetMapping("/slots")
+    public Result<List<AdminSlotVo>> listSlots(@RequestHeader("Authorization") String authHeader,
+                                               @RequestParam(required = false) String specialistId,
+                                               @RequestParam(required = false) String date,
+                                               @RequestParam(required = false) String from,
+                                               @RequestParam(required = false) String to,
+                                               @RequestParam(required = false) Boolean available) {
+        if (!authService.verifyAsAdmin(authHeader)) {
+            return Result.error("ERROR", "please use admin role");
+        }
+        return Result.success(adminService.listSlots(specialistId, date, from, to, available));
+    }
+
+    @PostMapping("/slots")
+    public Result<AdminSlotVo> createSlot(@RequestHeader("Authorization") String authHeader,
+                                          @RequestBody SlotRequest request) {
+        if (!authService.verifyAsAdmin(authHeader)) {
+            return Result.error("ERROR", "please use admin role");
+        }
+        return Result.success(adminService.createSlot(request.getSpecialistId(), request.getDate(), request.getStart(), request.getEnd(), request.getAvailable()));
+    }
+
+    @PatchMapping("/slots/{id}")
+    public Result<AdminSlotVo> updateSlot(@RequestHeader("Authorization") String authHeader,
+                                          @PathVariable String id,
+                                          @RequestBody SlotRequest request) {
+        if (!authService.verifyAsAdmin(authHeader)) {
+            return Result.error("ERROR", "please use admin role");
+        }
+        return Result.success(adminService.updateSlot(id, request));
+    }
+
+    @DeleteMapping("/slots/{id}")
+    public Result<Void> deleteSlot(@RequestHeader("Authorization") String authHeader, @PathVariable String id) {
+        if (!authService.verifyAsAdmin(authHeader)) {
+            return Result.error("ERROR", "please use admin role");
+        }
+        adminService.deleteSlot(id);
+        return Result.success("slot deleted successfully");
+    }
+
+    @GetMapping("/bookings")
+    public Result<BookingPageResult> listBookings(@RequestHeader("Authorization") String authHeader,
+                                                  @RequestParam(defaultValue = "1") Integer page,
+                                                  @RequestParam(defaultValue = "10") Integer pageSize) {
+        if (!authService.verifyAsAdmin(authHeader)) {
+            return Result.error("ERROR", "please use admin role");
+        }
+        return Result.success(adminService.listBookings(page, pageSize));
+    }
+
+    @GetMapping("/bookings/{id}")
+    public Result<SingleBookingVo> getBooking(@RequestHeader("Authorization") String authHeader,
+                                              @PathVariable String id) {
+        if (!authService.verifyAsAdmin(authHeader)) {
+            return Result.error("ERROR", "please use admin role");
+        }
+        return Result.success(customerBookingService.getSingleBookingInfo(id));
     }
 
 }

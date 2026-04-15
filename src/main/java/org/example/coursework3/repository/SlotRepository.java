@@ -15,4 +15,6 @@ public interface SlotRepository extends JpaRepository<Slot, String> {
     Slot getById(String id);
 
     Slot getSlotById(String id);
+
+    List<Slot> getSlotBySpecialistId(String specialistId);
 }
