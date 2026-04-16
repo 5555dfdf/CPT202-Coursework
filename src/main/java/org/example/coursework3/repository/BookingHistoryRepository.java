@@ -7,4 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface BookingHistoryRepository extends JpaRepository<BookingHistory, String> {
     boolean existsByBookingIdAndStatus(String bookingId, BookingStatus status);
+
+
+    BookingHistory getByBookingIdAndStatus(String id, BookingStatus status);
 }

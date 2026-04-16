@@ -6,11 +6,9 @@ import org.example.coursework3.dto.request.CreateBookingRequest;
 import org.example.coursework3.dto.response.BookingActionResult;
 import org.example.coursework3.dto.response.BookingPageResult;
 import org.example.coursework3.dto.response.CreateBookingResult;
-import org.example.coursework3.entity.Booking;
-import org.example.coursework3.entity.BookingStatus;
-import org.example.coursework3.entity.Slot;
-import org.example.coursework3.entity.User;
+import org.example.coursework3.entity.*;
 import org.example.coursework3.exception.MsgException;
+import org.example.coursework3.repository.BookingHistoryRepository;
 import org.example.coursework3.repository.BookingRepository;
 import org.example.coursework3.repository.SlotRepository;
 import org.example.coursework3.repository.UserRepository;
@@ -35,6 +33,7 @@ public class CustomerBookingService {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final AliyunMailService aliyunMailService;
+    private final BookingHistoryRepository bookingHistoryRepository;
 
     @Transactional
     public CreateBookingResult creatBooking(String userId, CreateBookingRequest request) {
@@ -171,13 +170,18 @@ public class CustomerBookingService {
             throw new MsgException("新时段与原专家不匹配");
         }
 
+        BookingHistory history = new BookingHistory();
+        history.setBookingId(bookingId);
+        history.setStatus(BookingStatus.Rescheduled);
+        bookingHistoryRepository.save(history);
+
         Slot oldSlot = slotRepository.findById(booking.getSlotId()).orElse(null);
         if (oldSlot != null) {
             oldSlot.setAvailable(true);
             slotRepository.save(oldSlot);
         }
         booking.setSlotId(newSlotId);
-        booking.setStatus(BookingStatus.Rescheduled);
+        booking.setStatus(BookingStatus.Pending);
         bookingRepository.save(booking);
         newSlot.setAvailable(false);
         slotRepository.save(newSlot);

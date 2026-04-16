@@ -14,11 +14,12 @@ public class BookingRequestVo {
     private String status;
 
     public static BookingRequestVo fromBooking(Booking booking, String customerName,Slot slot){
+        DateTimeFormatter timeFmtDate = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        DateTimeFormatter timeFmtTime = DateTimeFormatter.ofPattern("HH:mm");
         BookingRequestVo vo = new BookingRequestVo();
         vo.setId(booking.getId());
         vo.setCustomerName(customerName);
-        vo.setTime(slot.getStartTime()
-                .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+        vo.setTime(slot.getStartTime().toLocalDate().format(timeFmtDate) + " - " + slot.getStartTime().toLocalTime().format(timeFmtTime));
         vo.setStatus(booking.getStatus().name());
         return vo;
     }

@@ -234,20 +234,7 @@ public class AdminService {
         slot.setType(normalizeType(request.getType()));
         slot.setDetail(normalizeDetail(request.getDetail()));
         slotRepository.save(slot);
-
-        AdminSlotVo vo = new AdminSlotVo();
-        vo.setId(slot.getId());
-        vo.setSpecialistId(slot.getSpecialistId());
-        vo.setDate(startNew.toLocalDate().toString());
-        vo.setStart(from.trim());
-        vo.setEnd(to.trim());
-        vo.setAvailable(slot.getAvailable());
-        vo.setAmount(slot.getAmount());
-        vo.setCurrency(slot.getCurrency());
-        vo.setDuration(slot.getDuration());
-        vo.setType(slot.getType());
-        vo.setDetail(slot.getDetail());
-        return vo;
+        return AdminSlotVo.form(slot);
     }
 
     public AdminSlotVo updateSlot(String id, SlotRequest request) {
@@ -284,8 +271,10 @@ public class AdminService {
 
         slot.setStartTime(startNew);
         slot.setEndTime(endNew);
-        if (request.getAvailable() != null) {
+        if (slot.getAvailable()&&request.getAvailable() != null) {
             slot.setAvailable(request.getAvailable());
+        }else {
+            throw new MsgException("该时段已有预约无法修改状态");
         }
         if (request.getAmount() != null) {
             slot.setAmount(normalizeAmount(request.getAmount()));
@@ -303,21 +292,7 @@ public class AdminService {
             slot.setDetail(normalizeDetail(request.getDetail()));
         }
         slotRepository.save(slot);
-
-        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
-        AdminSlotVo vo = new AdminSlotVo();
-        vo.setId(slot.getId());
-        vo.setSpecialistId(slot.getSpecialistId());
-        vo.setDate(slot.getStartTime().toLocalDate().toString());
-        vo.setStart(slot.getStartTime().toLocalTime().format(timeFmt));
-        vo.setEnd(slot.getEndTime().toLocalTime().format(timeFmt));
-        vo.setAvailable(slot.getAvailable());
-        vo.setAmount(slot.getAmount());
-        vo.setCurrency(slot.getCurrency());
-        vo.setDuration(slot.getDuration());
-        vo.setType(slot.getType());
-        vo.setDetail(slot.getDetail());
-        return vo;
+        return AdminSlotVo.form(slot);
     }
 
     public void deleteSlot(String id) {
@@ -434,20 +409,7 @@ public class AdminService {
     @Transactional
     public AdminSlotVo getSingleSlotInfo(String id) {
         Slot slot = slotRepository.getById(id);
-        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
-        AdminSlotVo vo = new AdminSlotVo();
-        vo.setId(slot.getId());
-        vo.setSpecialistId(slot.getSpecialistId());
-        vo.setDate(slot.getStartTime().toLocalDate().toString());
-        vo.setStart(slot.getStartTime().toLocalTime().format(timeFmt));
-        vo.setEnd(slot.getEndTime().toLocalTime().format(timeFmt));
-        vo.setAvailable(slot.getAvailable());
-        vo.setAmount(slot.getAmount());
-        vo.setCurrency(slot.getCurrency());
-        vo.setDuration(slot.getDuration());
-        vo.setType(slot.getType());
-        vo.setDetail(slot.getDetail());
-        return vo;
+        return AdminSlotVo.form(slot);
 
     }
 }

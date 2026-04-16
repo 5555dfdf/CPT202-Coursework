@@ -9,7 +9,7 @@ public class SlotRequest {
     private String date;
     private String start;
     private String end;
-    private Boolean available = true;
+    private Boolean available;
     private BigDecimal amount;
     private String currency;
     private Integer duration;

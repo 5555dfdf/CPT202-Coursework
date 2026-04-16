@@ -14,6 +14,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -70,7 +71,6 @@ public class SpecialistBookingService {
             voList = bookingPage.getContent().stream()
                     .map(booking ->{
                         User customer = userRepository.findById(booking.getCustomerId());
-                        System.out.println(customer);
                         String customerName = customer.getName();
                         Slot slot = slotRepository.findById(booking.getSlotId()).orElse(null);
                         return BookingRequestVo.fromBooking(booking,customerName, slot);
@@ -171,13 +171,19 @@ public class SpecialistBookingService {
                 );
 
         if (exists) {
-            log.info("该状态记录已存在，跳过：{}", booking.getId());
+            BookingHistory history =
+                    bookingHistoryRepository
+                            .getByBookingIdAndStatus(
+                                    booking.getId(),
+                                    booking.getStatus()
+                            );
+            history.setChangedAt(LocalDateTime.now());
+            log.info("该状态记录已存在，更新操作时间：{}", booking.getId());
             return;
         }
 
         // 2. 只创建一条历史记录
         BookingHistory history = new BookingHistory();
-        history.setId(UUID.randomUUID().toString());
         history.setBookingId(booking.getId());
         history.setStatus(booking.getStatus());
         history.setReason(booking.getNote());
