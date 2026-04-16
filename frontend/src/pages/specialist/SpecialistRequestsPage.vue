@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { api } from '@/api/client'
+import { showConfirmModal } from '@/ui/confirmModal.js'
 const status = ref('Pending')
 const page = ref({ items: [], total: 0 })
 const loading = ref(false)
@@ -27,29 +28,41 @@ async function load() {
 onMounted(load)
 watch(status, () => load())
 
-async function onConfirm(id) {
-  busyId.value = id
-  try {
-    await api.confirmBooking(id)
-    await load()
-  } catch (e) {
-    error.value = e?.message || 'Failed to confirm'
-  } finally {
-    busyId.value = ''
-  }
+function onConfirm(id) {
+  showConfirmModal({
+    title: 'Confirm acceptance',
+    message: 'Are you sure you want to accept this reservation?',
+    onConfirm: async () => {
+      busyId.value = id
+      try {
+        await api.confirmBooking(id)
+        await load()
+      } catch (e) {
+        error.value = e?.message || 'Failed to confirm'
+      } finally {
+        busyId.value = ''
+      }
+    }
+  })
 }
 
-async function onReject(id) {
-  busyId.value = id
-  try {
-    await api.rejectBooking(id, { reason: rejectReason.value.trim() || undefined })
-    rejectReason.value = ''
-    await load()
-  } catch (e) {
-    error.value = e?.message || 'Failed to reject'
-  } finally {
-    busyId.value = ''
-  }
+function onReject(id) {
+  showConfirmModal({
+    title: 'Refuse Reservation',
+    message: 'Are you sure you want to decline this reservation',
+    onConfirm: async () => {
+      busyId.value = id
+      try {
+        await api.rejectBooking(id, { reason: rejectReason.value.trim() || undefined })
+        rejectReason.value = ''
+        await load()
+      } catch (e) {
+        error.value = e?.message || 'Failed to reject'
+      } finally {
+        busyId.value = ''
+      }
+    }
+  })
 }
 </script>
 
@@ -91,23 +104,23 @@ async function onReject(id) {
         </div>
         <div class="actions">
           <input
-            v-model="rejectReason"
-            class="input input--sm"
-            placeholder="Rejection reason (optional)"
+              v-model="rejectReason"
+              class="input input--sm"
+              placeholder="Rejection reason (optional)"
           />
           <button
-            type="button"
-            class="btn btn--ok"
-            :disabled="busyId === b.id"
-            @click="onConfirm(b.id)"
+              type="button"
+              class="btn btn--ok"
+              :disabled="busyId === b.id"
+              @click="onConfirm(b.id)"
           >
             Confirm
           </button>
           <button
-            type="button"
-            class="btn btn--danger"
-            :disabled="busyId === b.id"
-            @click="onReject(b.id)"
+              type="button"
+              class="btn btn--danger"
+              :disabled="busyId === b.id"
+              @click="onReject(b.id)"
           >
             Reject
           </button>

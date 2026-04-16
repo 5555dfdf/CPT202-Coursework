@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { showConfirmModal } from '@/ui/confirmModal.js'
 import {
   BadgeDollarSign,
   CalendarCheck,
@@ -18,7 +19,7 @@ const mobileNavOpen = ref(false)
 
 const role = computed(() => auth.user?.role || '')
 const logoutButtonClass = computed(() =>
-  role.value === 'Customer' ? 'logout-btn--customer' : 'logout-btn--team'
+    role.value === 'Customer' ? 'logout-btn--customer' : 'logout-btn--team'
 )
 
 const links = computed(() => {
@@ -50,9 +51,15 @@ const links = computed(() => {
   return []
 })
 
-async function onLogout() {
-  await auth.logout()
-  await router.replace({ name: 'login' })
+function onLogout() {
+  showConfirmModal({
+    title: 'Log out',
+    message: 'Are you sure you want to log out of the current account?',
+    onConfirm: async () => {
+      await auth.logout()
+      await router.replace({ name: 'login' })
+    }
+  })
 }
 </script>
 
@@ -92,10 +99,10 @@ async function onLogout() {
 
       <nav v-if="mobileNavOpen" class="mobile-nav">
         <router-link
-          v-for="l in links"
-          :key="l.to"
-          :to="l.to"
-          @click="mobileNavOpen = false"
+            v-for="l in links"
+            :key="l.to"
+            :to="l.to"
+            @click="mobileNavOpen = false"
         >
           <component :is="l.icon" class="mobile-nav__icon" />
           <span>{{ l.label }}</span>

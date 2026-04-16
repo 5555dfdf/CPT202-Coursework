@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/api/client'
 import { showAlertModal } from '@/ui/alertModal'
-
+import { showConfirmModal } from '@/ui/confirmModal.js'
 const auth = useAuthStore()
 const specialistId = ref('')
 const slotDate = ref(new Date().toISOString().slice(0, 10))
@@ -47,27 +47,34 @@ async function handleComplete(slotId, bookingId) {
     return
   }
 
-  busySlotId.value = slotId
-  try {
-    await api.completeBooking(bookingId)
+  showConfirmModal({
+    title: 'Complete Reservation',
+    message: 'Are you sure that this reservation service has been completed?  \n' +
+        'Once confirmed, the status will change to \'Completed\'.',
+    onConfirm: async () => {
+      busySlotId.value = slotId
+      try {
+        await api.completeBooking(bookingId)
 
-    showAlertModal({
-      title: 'Success',
-      message: 'Booking completed successfully.',
-      type: 'success'
-    })
+        showAlertModal({
+          title: 'Success',
+          message: 'Booking completed successfully.',
+          type: 'success'
+        })
 
-    await loadSlots()
-  } catch (e) {
-    error.value = e?.message || 'Failed to complete booking'
-    showAlertModal({
-      title: 'Error',
-      message: error.value,
-      type: 'error'
-    })
-  } finally {
-    busySlotId.value = ''
-  }
+        await loadSlots()
+      } catch (e) {
+        error.value = e?.message || 'Failed to complete booking'
+        showAlertModal({
+          title: 'Error',
+          message: error.value,
+          type: 'error'
+        })
+      } finally {
+        busySlotId.value = ''
+      }
+    }
+  })
 }
 
 function getStatusClass(status) {
