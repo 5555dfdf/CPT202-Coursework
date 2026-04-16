@@ -71,6 +71,6 @@ public class BookingController {
             return Result.error("ERROR", "请以顾客身份查看");
         }
         bookingService.rescheduleBooking(id, request.getSlotId());
-        return Result.success(new RescheduleBookingResult(id, BookingStatus.Rescheduled, request.getSlotId()));
+        return Result.success(new RescheduleBookingResult(id, BookingStatus.Pending, request.getSlotId()));
     }
 }

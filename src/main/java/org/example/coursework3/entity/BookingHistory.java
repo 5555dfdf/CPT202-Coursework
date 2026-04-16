@@ -4,6 +4,7 @@ package org.example.coursework3.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 
@@ -12,6 +13,8 @@ import java.time.LocalDateTime;
 @Data
 public class BookingHistory {
     @Id
+    @GeneratedValue
+    @UuidGenerator
     @Column(length = 36)
     private String id;
 
