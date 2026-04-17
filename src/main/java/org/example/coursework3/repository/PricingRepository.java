@@ -13,6 +13,14 @@ public interface PricingRepository extends JpaRepository<Pricing, String> {
             String type
     );
 
+    List<Pricing> findAllByOrderByUpdatedAtDescCreatedAtDesc();
+
+    List<Pricing> findBySpecialistIdOrderByUpdatedAtDescCreatedAtDesc(String specialistId);
+
+    boolean existsBySpecialistIdAndDurationAndType(String specialistId, Integer duration, String type);
+
+    boolean existsBySpecialistIdAndDurationAndTypeAndIdNot(String specialistId, Integer duration, String type, String id);
+
     List<Pricing> findFirstBySpecialistIdAndDurationOrderByCreatedAtDesc(
             String specialistId,
             Integer duration

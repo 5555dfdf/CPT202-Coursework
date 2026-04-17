@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 
@@ -13,6 +14,8 @@ import java.time.LocalDateTime;
 public class Pricing {
 
     @Id
+    @GeneratedValue
+    @UuidGenerator
     private String id;
 
 
