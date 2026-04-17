@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
@@ -19,10 +19,15 @@ const loading = ref(false)
 const error = ref('')
 const note = ref('')
 const submitting = ref(false)
+const previewLoading = ref(false)
+const previewError = ref('')
+const weeklyPreview = ref([])
+const previewOpen = ref(false)
+const todayDate = new Date().toISOString().slice(0, 10)
 
 function formatSlotTime(value) {
   const raw = String(value ?? '').trim()
-  if (!raw) return '—'
+  if (!raw) return '--'
 
   const timeMatch = raw.match(/T?(\d{2}:\d{2})/)
   if (timeMatch) return timeMatch[1]
@@ -45,12 +50,65 @@ function formatSession(slot) {
   const duration = Number(slot?.duration ?? 0)
   const safeDuration = Number.isNaN(duration) || duration <= 0 ? '--' : `${duration} min`
   const type = String(slot?.type ?? 'online').trim() || 'online'
-  return `${safeDuration} · ${type}`
+  return `${safeDuration} 路 ${type}`
 }
 
 function formatDetail(slot) {
   return String(slot?.detail ?? '').trim() || '--'
 }
+
+function nextSevenDates() {
+  const out = []
+  const base = new Date()
+  for (let i = 0; i < 7; i += 1) {
+    const d = new Date(base)
+    d.setDate(base.getDate() + i)
+    out.push(d.toISOString().slice(0, 10))
+  }
+  return out
+}
+
+async function loadWeeklyPreview() {
+  if (!props.id) return
+
+  previewLoading.value = true
+  previewError.value = ''
+  try {
+    const days = nextSevenDates()
+    const rows = await Promise.all(
+      days.map(async (date) => {
+        const list = await api.listSpecialistSlots(props.id, { date })
+        const available = (Array.isArray(list) ? list : []).filter((sl) => sl?.available !== false)
+        return {
+          date,
+          slots: available
+        }
+      })
+    )
+    weeklyPreview.value = rows
+  } catch (e) {
+    previewError.value = e?.message || 'Failed to load weekly preview'
+    weeklyPreview.value = []
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+function togglePreview() {
+  previewOpen.value = !previewOpen.value
+}
+
+const todayPreviewSlots = computed(() => {
+  const today = weeklyPreview.value.find((d) => d.date === todayDate)
+  return today?.slots ?? []
+})
+
+const todayPreviewText = computed(() => {
+  if (previewLoading.value) return 'Loading today availability...'
+  if (previewError.value) return 'Failed to load today availability'
+  if (!todayPreviewSlots.value.length) return 'Today: No available slots'
+  return `Today: ${todayPreviewSlots.value.map((sl) => formatSlotRange(sl)).join(' 路 ')}`
+})
 
 async function loadSlots() {
   if (!props.id) return
@@ -117,7 +175,9 @@ async function submitBooking() {
 
 watch(
     () => props.id,
-    () => loadSlots(),
+    async () => {
+      await Promise.all([loadSlots(), loadWeeklyPreview()])
+    },
     { immediate: true }
 )
 
@@ -145,6 +205,31 @@ defineExpose({
       <div class="card">
         <div class="title">Available Slots</div>
 
+        <section class="field">
+          <span class="label">Availability Preview</span>
+          <div class="preview-panel" :class="{ 'is-open': previewOpen }">
+            <button type="button" class="preview-head" @click="togglePreview">
+              <span class="preview-title">{{ todayPreviewText }}</span>
+              <span class="preview-toggle">{{ previewOpen ? '^' : 'v' }}</span>
+            </button>
+            <div v-if="previewOpen" class="preview-body">
+              <p v-if="previewError" class="banner banner--error preview-banner">{{ previewError }}</p>
+              <p v-else-if="previewLoading" class="muted small preview-loading">Loading next 7 days...</p>
+              <ul v-else class="preview-list">
+                <li v-for="day in weeklyPreview" :key="day.date" class="preview-row">
+                  <span class="preview-date">{{ day.date }}</span>
+                  <div v-if="day.slots.length" class="preview-slots">
+                    <span v-for="sl in day.slots" :key="sl.slotId ?? sl.id" class="preview-chip">
+                      {{ formatSlotRange(sl) }}
+                    </span>
+                  </div>
+                  <span v-else class="muted small">No slots</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
         <label class="field">
           <span class="label">Date</span>
           <input v-model="slotDate" type="date" lang="en" class="input" />
@@ -162,7 +247,7 @@ defineExpose({
               />
               <div class="slot-main">
                 <span class="slot-time">{{ formatSlotRange(sl) }}</span>
-                <span class="slot-meta">{{ formatMoney(sl) }} · {{ formatSession(sl) }}</span>
+                <span class="slot-meta">{{ formatMoney(sl) }} 路 {{ formatSession(sl) }}</span>
                 <span class="slot-meta slot-meta--detail" :title="formatDetail(sl)">Detail: {{ formatDetail(sl) }}</span>
               </div>
               <span v-if="sl.available === false" class="muted small">(Full)</span>
@@ -197,20 +282,26 @@ defineExpose({
 </template>
 
 <style scoped>
+.page__header {
+  margin: 8px 0 20px;
+  padding: 0;
+}
+
 .page__header h1 {
-  margin: 0 0 6px;
-  font-size: 28px;
+  margin: 0;
+  font-size: clamp(32px, 3.1vw, 38px);
   font-weight: 800;
+  line-height: 1.12;
 }
 
 .subtitle {
-  margin: 0;
-  color: #5b6472;
+  margin: 6px 0 0;
+  color: #4b5563;
   font-size: 14px;
 }
 
 .muted {
-  opacity: 0.8;
+  color: #6b7280;
 }
 
 .small {
@@ -223,12 +314,12 @@ defineExpose({
 }
 
 .card {
-  margin-top: 14px;
+  margin-top: 6px;
   padding: 16px;
-  border: 1px solid #e6e8ef;
-  border-radius: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 0;
   background: #ffffff;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.06);
 }
 
 .title {
@@ -237,9 +328,109 @@ defineExpose({
   font-size: 18px;
 }
 
+.preview-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 400;
+  color: #757575;
+  font-family: monospace;
+  line-height: normal;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+  flex: 1;
+}
+
+.preview-panel {
+  border: 1px solid #d8d1cb;
+  background: #f8f5f2;
+}
+
+.preview-panel.is-open .preview-head {
+  border-bottom: 1px solid #d8d1cb;
+}
+
+.preview-head {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.preview-toggle {
+  font-size: 14px;
+  color: #4b5563;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.preview-body {
+  margin-top: 0;
+  background: #f8f5f2;
+}
+
+.preview-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.preview-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border-top: 1px solid #d8d1cb;
+}
+
+.preview-loading {
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.preview-date {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.preview-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preview-chip {
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border: 1px solid #d8d1cb;
+  background: #f8f5f2;
+  font-size: 12px;
+  color: #202124;
+  font-weight: 600;
+}
+
+.preview-banner {
+  margin: 0;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  border-bottom: 1px solid rgba(248, 113, 113, 0.45);
+}
+
 .field {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 10px;
 }
 
@@ -251,16 +442,19 @@ defineExpose({
 
 .input {
   width: 100%;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid #d3d8e1;
-  background: #ffffff;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 0;
+  border: 1px solid #d8d1cb;
+  background: #f8f5f2;
   color: #111827;
   outline: none;
 }
 
 .input--area {
   min-height: 92px;
+  height: auto;
+  padding: 10px 12px;
   resize: vertical;
 }
 
@@ -279,9 +473,9 @@ defineExpose({
   flex-wrap: wrap;
   cursor: pointer;
   padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid #e6e8ef;
-  background: #f8fafc;
+  border-radius: 0;
+  border: 1px solid #d8d1cb;
+  background: #f8f5f2;
 }
 
 .slot-main {
@@ -325,13 +519,13 @@ defineExpose({
 }
 
 .btn-submit {
-  margin-top: 10px;
+  margin-top: 6px;
   width: 100%;
   max-width: 260px;
-  height: 42px;
-  border: none;
-  border-radius: 10px;
-  background: #07c160;
+  height: 44px;
+  border: 1px solid #D9533C;
+  border-radius: 0;
+  background: #D9533C;
   color: #ffffff;
   font-size: 14px;
   font-weight: 700;
@@ -339,11 +533,21 @@ defineExpose({
 }
 
 .btn-submit:hover:not(:disabled) {
-  background: #06ad56;
+  opacity: 0.92;
 }
 
 .btn-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+@media (max-width: 720px) {
+  .preview-row {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
+
+
+
+

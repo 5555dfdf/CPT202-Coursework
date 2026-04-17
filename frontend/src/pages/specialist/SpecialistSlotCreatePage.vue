@@ -22,6 +22,7 @@ const createForm = ref({
 
 const loading = ref(false)
 const createLoading = ref(false)
+const DETAIL_MAX = 300
 
 const createDurationMinutes = computed(() => {
   return calcDurationMinutes(createForm.value.start, createForm.value.end)
@@ -273,8 +274,10 @@ onMounted(async () => {
             v-model="createForm.detail" 
             class="input input--textarea" 
             rows="3" 
+            maxlength="300"
             :disabled="createLoading"
           ></textarea>
+          <p class="detail-count">{{ (createForm.detail || '').length }}/{{ DETAIL_MAX }}</p>
         </label>
 
         <div class="form-actions">
@@ -386,6 +389,13 @@ onMounted(async () => {
   padding: 12px;
 }
 
+.detail-count {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+  text-align: right;
+}
+
 .option-row {
   display: flex;
   flex-wrap: wrap;
@@ -436,41 +446,41 @@ onMounted(async () => {
 }
 
 .btn-primary:hover {
-  background: #8b3735;
+  opacity: 0.92;
 }
 
 .btn-secondary {
   height: 44px;
-  padding: 0 20px;
-  border: 1px solid #000000;
+  padding: 0 14px;
+  border: 1px solid #202124;
   border-radius: 0;
   background: #ffffff;
-  color: #000000;
-  font-size: 14px;
-  font-weight: 600;
+  color: #202124;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: opacity 0.18s ease;
 }
 
 .btn-secondary:hover {
-  background: #f3f4f6;
+  opacity: 0.92;
 }
 
 .btn-neutral {
   height: 44px;
-  padding: 0 20px;
-  border: 1px solid #d8d1cb;
+  padding: 0 14px;
+  border: 1px solid #202124;
   border-radius: 0;
   background: #ffffff;
-  color: #374151;
-  font-size: 14px;
-  font-weight: 600;
+  color: #202124;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: opacity 0.18s ease;
 }
 
 .btn-neutral:hover {
-  background: #f8f5f2;
+  opacity: 0.92;
 }
 
 .btn-primary:disabled,

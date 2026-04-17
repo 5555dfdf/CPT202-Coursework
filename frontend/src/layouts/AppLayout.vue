@@ -55,6 +55,7 @@ function onLogout() {
   showConfirmModal({
     title: 'Log out',
     message: 'Are you sure you want to log out of the current account?',
+    confirmVariant: role.value === 'Customer' ? 'customer' : '',
     onConfirm: async () => {
       await auth.logout()
       await router.replace({ name: 'login' })

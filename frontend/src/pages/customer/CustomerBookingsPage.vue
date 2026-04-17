@@ -1,13 +1,15 @@
 ﻿<script setup>
 import { onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
 import { api } from '@/api/client'
+import CustomerBookingDetailPage from '@/pages/customer/CustomerBookingDetailPage.vue'
 
 const status = ref('')
 const page = ref({ items: [], total: 0, page: 1, pageSize: 10 })
 const query = ref({ from: '', to: '', page: 1, pageSize: 10 })
 const loading = ref(false)
 const error = ref('')
+const detailOpen = ref(false)
+const detailBookingId = ref('')
 
 function formatTime(value) {
   if (!value) return '—'
@@ -66,6 +68,17 @@ function totalPages() {
   const total = Number(page.value.total || 0)
   const size = Number(page.value.pageSize || query.value.pageSize || 10)
   return Math.max(1, Math.ceil(total / size))
+}
+
+function openDetail(id) {
+  if (!id) return
+  detailBookingId.value = id
+  detailOpen.value = true
+}
+
+function closeDetail() {
+  detailOpen.value = false
+  detailBookingId.value = ''
 }
 
 onMounted(load)
@@ -128,9 +141,9 @@ watch(status, () => onSearch())
           <div class="muted small">Specialist: {{ b.specialistName ?? b.specialistId ?? '—' }}</div>
           <div class="status" :class="statusClass(b.status)">{{ b.status ?? '—' }}</div>
         </div>
-        <RouterLink class="link" :to="{ name: 'customer.bookingDetail', params: { id: b.id } }">
+        <button type="button" class="link" @click="openDetail(b.id)">
           Details
-        </RouterLink>
+        </button>
       </li>
     </ul>
 
@@ -143,67 +156,91 @@ watch(status, () => onSearch())
         Next
       </button>
     </div>
+
+    <div v-if="detailOpen" class="modal-backdrop" @click.self="closeDetail">
+      <section class="modal-card">
+        <div class="modal-head">
+          <h3 class="modal-title">Booking Details</h3>
+          <button type="button" class="modal-close" @click="closeDetail">×</button>
+        </div>
+        <CustomerBookingDetailPage
+          v-if="detailBookingId"
+          :id="detailBookingId"
+          embedded
+          @close="closeDetail"
+        />
+      </section>
+    </div>
   </section>
 </template>
 
 <style scoped>
+.page__header {
+  margin: 8px 0 20px;
+  padding: 0;
+}
+
 .page__header h1 {
-  margin: 0 0 6px;
-  font-size: 28px;
+  margin: 0;
+  font-size: clamp(32px, 3.1vw, 38px);
   font-weight: 800;
+  line-height: 1.12;
 }
 .subtitle {
-  margin: 0;
+  margin: 6px 0 0;
   font-size: 14px;
-  color: #5b6472;
+  color: #4b5563;
 }
 .toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
   gap: 12px;
-  margin-top: 14px;
-  padding: 14px;
-  border: 1px solid #e6e8ef;
-  border-radius: 14px;
-  background: #f8fafc;
+  margin-top: 10px;
+  padding: 16px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.06);
 }
 .field {
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 .label {
   font-size: 13px;
-  opacity: 0.85;
+  color: #4b5563;
+  font-weight: 600;
 }
 .input {
   min-width: 160px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid #d3d8e1;
-  background: #ffffff;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 0;
+  border: 1px solid #d8d1cb;
+  background: #f8f5f2;
   color: #111827;
 }
 .btn {
-  padding: 10px 16px;
-  border-radius: 10px;
-  border: 1px solid #07c160;
-  background: #07c160;
+  padding: 0 16px;
+  border-radius: 0;
+  border: 1px solid #D9533C;
+  background: #D9533C;
   color: #ffffff;
   font-weight: 700;
   cursor: pointer;
-  height: 42px;
+  height: 44px;
 }
 .btn--ghost {
-  border: 1px solid #d3d8e1;
+  border: 1px solid #202124;
   background: #ffffff;
-  color: #334155;
+  color: #202124;
 }
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
 }
 .muted {
-  opacity: 0.8;
+  color: #6b7280;
 }
 .small {
   font-size: 12px;
@@ -211,10 +248,10 @@ watch(status, () => onSearch())
 }
 .card {
   padding: 16px;
-  border: 1px solid #e6e8ef;
-  border-radius: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 0;
   background: #ffffff;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.06);
 }
 .row {
   display: flex;
@@ -243,12 +280,12 @@ watch(status, () => onSearch())
   align-items: center;
   height: 28px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: 0;
   font-size: 12px;
   font-weight: 700;
-  border: 1px solid #d0d7e2;
-  background: #f8fafc;
-  color: #334155;
+  border: 1px solid #d8d1cb;
+  background: #f8f5f2;
+  color: #374151;
 }
 .status--pending {
   background: #fff7ed;
@@ -274,14 +311,15 @@ watch(status, () => onSearch())
   align-items: center;
   justify-content: center;
   min-width: 100px;
-  height: 38px;
+  height: 40px;
   padding: 0 12px;
-  border-radius: 10px;
-  border: 1px solid #07c160;
-  background: #07c160;
+  border-radius: 0;
+  border: 1px solid #D9533C;
+  background: #D9533C;
   color: #ffffff;
   font-weight: 700;
   text-decoration: none;
+  cursor: pointer;
 }
 .banner {
   margin-top: 14px;
@@ -297,9 +335,9 @@ watch(status, () => onSearch())
 .empty {
   margin-top: 16px;
   padding: 18px;
-  border: 1px dashed #cfd5df;
-  border-radius: 14px;
-  background: #fbfcfe;
+  border: 1px dashed #d1d5db;
+  border-radius: 0;
+  background: #fafafa;
 }
 .empty__title {
   font-weight: 700;
@@ -315,6 +353,49 @@ watch(status, () => onSearch())
   font-size: 13px;
   color: #475569;
 }
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(17, 24, 39, 0.42);
+}
+.modal-card {
+  width: min(100%, 980px);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 0;
+  padding: 14px 16px 16px;
+  box-shadow: 0 16px 36px rgba(17, 24, 39, 0.16);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #111827;
+}
+.modal-close {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d8d1cb;
+  border-radius: 0;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
 
 @media (max-width: 720px) {
   .row {
@@ -325,5 +406,10 @@ watch(status, () => onSearch())
   .link {
     width: 100%;
   }
+
+  .modal-card {
+    padding: 10px;
+  }
 }
 </style>
+

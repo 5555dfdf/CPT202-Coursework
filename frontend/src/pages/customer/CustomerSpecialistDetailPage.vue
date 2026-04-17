@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
+import { formatReferencePrice } from '@/ui/referencePrice'
 
 const props = defineProps({
   id: { type: String, required: true }
@@ -63,7 +64,7 @@ watch(
           </div>
           <div v-if="specialist.price != null" class="meta-item">
             <span class="meta-key">Reference Price</span>
-            <span class="meta-value">￥{{ specialist.price }}</span>
+            <span class="meta-value">{{ formatReferencePrice(specialist.price, specialist.currency) }}</span>
           </div>
         </div>
       </div>
@@ -76,18 +77,24 @@ watch(
 </template>
 
 <style scoped>
+.page__header {
+  margin: 8px 0 20px;
+  padding: 0;
+}
+
 .page__header h1 {
-  margin: 0 0 6px;
-  font-size: 28px;
+  margin: 0;
+  font-size: clamp(32px, 3.1vw, 38px);
   font-weight: 800;
+  line-height: 1.12;
 }
 .subtitle {
-  margin: 0;
-  color: #5b6472;
+  margin: 6px 0 0;
+  color: #4b5563;
   font-size: 14px;
 }
 .muted {
-  opacity: 0.8;
+  color: #6b7280;
 }
 .small {
   font-size: 12px;
@@ -97,16 +104,16 @@ watch(
   font-size: 13px;
 }
 .card {
-  margin-top: 14px;
+  margin-top: 10px;
   padding: 16px;
-  border: 1px solid #e6e8ef;
-  border-radius: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 0;
   background: #ffffff;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.06);
 }
 .title {
   font-weight: 700;
-  font-size: 20px;
+  font-size: 18px;
   margin-bottom: 8px;
 }
 .bio {
@@ -128,10 +135,10 @@ watch(
 .meta-key {
   font-size: 12px;
   font-weight: 700;
-  color: #4b5563;
-  background: #f1f5f9;
-  border: 1px solid #dbe2ea;
-  border-radius: 999px;
+  color: #374151;
+  background: #f8f5f2;
+  border: 1px solid #d8d1cb;
+  border-radius: 0;
   padding: 3px 10px;
 }
 .meta-value {
@@ -154,16 +161,18 @@ watch(
 .btn-book {
   width: 100%;
   margin-top: 20px;
-  padding: 12px 18px;
-  border-radius: 10px;
-  border: none;
-  background: #07c160;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 0;
+  border: 1px solid #D9533C;
+  background: #D9533C;
   color: #fff;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
 }
 .btn-book:hover {
-  background: #06ad56;
+  opacity: 0.92;
 }
 </style>
+

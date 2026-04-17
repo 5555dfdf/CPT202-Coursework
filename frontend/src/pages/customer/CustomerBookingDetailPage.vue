@@ -1,11 +1,13 @@
 ﻿<script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 
 const props = defineProps({
-  id: { type: String, required: true }
+  id: { type: String, required: true },
+  embedded: { type: Boolean, default: false }
 })
+const emit = defineEmits(['close'])
 
 const router = useRouter()
 const booking = ref(null)
@@ -14,6 +16,11 @@ const error = ref('')
 const cancelReason = ref('')
 const busy = ref('')
 const actionError = ref('')
+const reasonFocused = ref(false)
+const reasonLimitError = ref('')
+
+const REASON_MAX = 300
+const showReasonHelper = computed(() => reasonFocused.value || !!reasonLimitError.value)
 
 function formatMoney(amount, currency) {
   const n = Number(amount ?? 0)
@@ -41,6 +48,17 @@ watch(
   { immediate: true }
 )
 
+watch(cancelReason, (val) => {
+  if (val.length > REASON_MAX) {
+    cancelReason.value = val.slice(0, REASON_MAX)
+    reasonLimitError.value = `Maximum ${REASON_MAX} characters allowed.`
+    return
+  }
+  if (val.length < REASON_MAX) {
+    reasonLimitError.value = ''
+  }
+})
+
 async function onCancel() {
   actionError.value = ''
   busy.value = 'cancel'
@@ -48,8 +66,12 @@ async function onCancel() {
     booking.value = await api.cancelBooking(props.id, {
       reason: cancelReason.value.trim() || undefined
     })
-    window.alert('Booking cancelled successfully.')
-    await router.push({ name: 'customer.bookings' })
+    if (props.embedded) {
+      emit('close')
+    } else {
+      window.alert('Booking cancelled successfully.')
+      await router.push({ name: 'customer.bookings' })
+    }
   } catch (e) {
     actionError.value = e?.message || 'Failed to cancel'
   } finally {
@@ -69,11 +91,22 @@ function goReschedule() {
     query: { bookingId: props.id }
   })
 }
+
+function onReasonFocus() {
+  reasonFocused.value = true
+}
+
+function onReasonBlur() {
+  reasonFocused.value = false
+  if (cancelReason.value.length <= REASON_MAX) {
+    reasonLimitError.value = ''
+  }
+}
 </script>
 
 <template>
-  <section class="page">
-    <header class="page__header">
+  <section class="page" :class="{ 'page--embedded': embedded }">
+    <header v-if="!embedded" class="page__header">
       <h1>Booking Details</h1>
     </header>
 
@@ -81,59 +114,84 @@ function goReschedule() {
     <div v-else-if="loading" class="card muted">Loading…</div>
 
     <template v-else-if="booking">
-      <div class="card">
-        <div class="title">Booking Info</div>
-        <dl class="kv">
-          <dt>Status</dt>
-          <dd>{{ booking.status ?? '—' }}</dd>
-          <dt>Time</dt>
-          <dd>{{ booking.time ?? booking.startTime ?? '—' }}</dd>
-          <dt>Specialist</dt>
-          <dd>{{ booking.specialistName ?? booking.specialistId ?? '—' }}</dd>
-          <dt>Duration</dt>
-          <dd>{{ booking.duration ?? booking.slot ?? booking.slotId ?? '—' }}</dd>
-          <dt>Price</dt>
-          <dd>{{ formatMoney(booking.amount, booking.currency) }}</dd>
-          <dt>Type</dt>
-          <dd>{{ booking.type ?? '—' }}</dd>
-          <dt>Detail</dt>
-          <dd class="detail-text" :title="booking.detail ?? '—'">{{ booking.detail ?? '—' }}</dd>
-          <dt>Note</dt>
-          <dd>{{ booking.note ?? '—' }}</dd>
-        </dl>
+      <div :class="embedded ? 'embedded-grid' : ''">
+        <div class="card">
+          <div class="title">Booking Info</div>
+          <dl class="kv">
+            <dt>Status</dt>
+            <dd>{{ booking.status ?? '—' }}</dd>
+            <dt>Time</dt>
+            <dd>{{ booking.time ?? booking.startTime ?? '—' }}</dd>
+            <dt>Specialist</dt>
+            <dd>{{ booking.specialistName ?? booking.specialistId ?? '—' }}</dd>
+            <dt>Duration</dt>
+            <dd>{{ booking.duration ?? booking.slot ?? booking.slotId ?? '—' }}</dd>
+            <dt>Price</dt>
+            <dd>{{ formatMoney(booking.amount, booking.currency) }}</dd>
+            <dt>Type</dt>
+            <dd>{{ booking.type ?? '—' }}</dd>
+            <dt>Detail</dt>
+            <dd class="detail-text" :title="booking.detail ?? '—'">{{ booking.detail ?? '—' }}</dd>
+            <dt>Note</dt>
+            <dd>{{ booking.note ?? '—' }}</dd>
+          </dl>
+        </div>
+
+        <div :class="embedded ? 'embedded-side' : ''">
+          <div class="card card--cancel">
+            <div class="title">Cancel Booking</div>
+            <label class="field">
+              <span class="label">Reason (optional)</span>
+              <input
+                v-model="cancelReason"
+                class="input"
+                placeholder="Reason"
+                maxlength="300"
+                @focus="onReasonFocus"
+                @blur="onReasonBlur"
+              />
+            </label>
+            <div
+              v-if="showReasonHelper"
+              class="limit-helper"
+              :class="{ 'limit-helper--error': reasonLimitError }"
+              role="status"
+              aria-live="polite"
+            >
+              <p class="limit-helper__text">{{ reasonLimitError || `Maximum ${REASON_MAX} characters` }}</p>
+              <p class="limit-helper__count">{{ cancelReason.length }}/{{ REASON_MAX }}</p>
+            </div>
+            <div class="cancel-action">
+              <button
+                type="button"
+                class="btn btn--danger"
+                :disabled="busy === 'cancel'"
+                @click="onCancel"
+              >
+                {{ busy === 'cancel' ? 'Processing…' : 'Cancel Booking' }}
+              </button>
+            </div>
+          </div>
+
+          <div class="card card--reschedule">
+            <div class="title">Reschedule</div>
+            <div class="reschedule-action">
+              <button
+                type="button"
+                class="btn"
+                @click="goReschedule"
+              >
+                Choose a new time slot
+              </button>
+            </div>
+          </div>
+
+          <p v-if="actionError" class="banner banner--error">{{ actionError }}</p>
+        </div>
       </div>
 
-      <div class="card">
-        <div class="title">Cancel Booking</div>
-        <label class="field">
-          <span class="label">Reason (optional)</span>
-          <input v-model="cancelReason" class="input" placeholder="Reason" />
-        </label>
-        <button
-          type="button"
-          class="btn btn--danger"
-          :disabled="busy === 'cancel'"
-          @click="onCancel"
-        >
-          {{ busy === 'cancel' ? 'Processing…' : 'Cancel Booking' }}
-        </button>
-      </div>
-
-      <div class="card">
-        <div class="title">Reschedule</div>
-        <button
-          type="button"
-          class="btn"
-          @click="goReschedule"
-        >
-          Choose a new time slot
-        </button>
-      </div>
-
-      <p v-if="actionError" class="banner banner--error">{{ actionError }}</p>
-
-      <p class="muted small">
-        <button type="button" class="linkish" @click="router.push({ name: 'customer.bookings' })">
+      <p v-if="!embedded" class="muted small">
+        <button type="button" class="linkish btn-neutral" @click="router.push({ name: 'customer.bookings' })">
           Back to My Bookings
         </button>
       </p>
@@ -142,12 +200,39 @@ function goReschedule() {
 </template>
 
 <style scoped>
+.page__header {
+  margin: 8px 0 20px;
+  padding: 0;
+}
+
 .page__header h1 {
-  margin: 0 0 6px;
-  font-size: 22px;
+  margin: 0;
+  font-size: clamp(32px, 3.1vw, 38px);
+  font-weight: 800;
+  line-height: 1.12;
+}
+.page--embedded .card:first-of-type {
+  margin-top: 0;
+}
+.embedded-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 460px;
+  gap: 14px;
+  align-items: stretch;
+}
+.embedded-side {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+.embedded-side .card {
+  margin-top: 0;
+}
+.embedded-side .card + .card {
+  margin-top: 14px;
 }
 .muted {
-  opacity: 0.8;
+  color: #6b7280;
 }
 .small {
   font-size: 12px;
@@ -159,14 +244,16 @@ function goReschedule() {
 }
 .card {
   margin-top: 14px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  padding: 16px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.06);
 }
 .title {
   font-weight: 700;
   margin-bottom: 10px;
+  font-size: 16px;
 }
 .kv {
   display: grid;
@@ -194,6 +281,26 @@ function goReschedule() {
   gap: 6px;
   margin-bottom: 10px;
 }
+.limit-helper {
+  border: 1px solid #ddd3cb;
+  background: #f8f5f2;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+.limit-helper--error {
+  border-color: rgba(180, 35, 24, 0.35);
+  background: rgba(180, 35, 24, 0.08);
+}
+.limit-helper__text {
+  margin: 0;
+  font-size: 12px;
+  color: #4b5563;
+}
+.limit-helper__count {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+}
 .label {
   font-size: 13px;
   opacity: 0.85;
@@ -201,26 +308,30 @@ function goReschedule() {
 .input {
   width: 100%;
   max-width: 400px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: #ffffff;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 0;
+  border: 1px solid #d8d1cb;
+  background: #f8f5f2;
   color: #111827;
 }
 .btn {
-  padding: 10px 16px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.1);
-  color: inherit;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 0;
+  border: 1px solid #D9533C;
+  background: #D9533C;
+  color: #ffffff;
+  font-weight: 700;
   cursor: pointer;
 }
 .btn--danger {
-  border-color: rgba(248, 113, 113, 0.5);
-  background: rgba(248, 113, 113, 0.15);
+  border-color: #D9533C;
+  background: #ffffff;
+  color: #D9533C;
 }
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 .banner {
@@ -235,12 +346,62 @@ function goReschedule() {
   color: #991b1b;
 }
 .linkish {
-  background: none;
-  border: none;
-  padding: 0;
-  color: inherit;
-  text-decoration: underline;
+  padding: 0 14px;
+  height: 40px;
+  text-decoration: none;
   cursor: pointer;
   font: inherit;
 }
+
+.btn-neutral {
+  border: 1px solid #202124;
+  border-radius: 0;
+  background: #ffffff;
+  color: #202124;
+  font-weight: 700;
+}
+
+.card--cancel .input {
+  max-width: none;
+}
+
+.card--cancel .btn--danger {
+  min-width: 220px;
+}
+
+.cancel-action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.card--reschedule .btn {
+  min-width: 220px;
+}
+
+.card--reschedule {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.reschedule-action {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+@media (max-width: 1080px) {
+  .embedded-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reschedule-action {
+    justify-content: flex-start;
+  }
+
+  .cancel-action {
+    justify-content: flex-start;
+  }
+}
 </style>
+

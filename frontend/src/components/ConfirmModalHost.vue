@@ -18,7 +18,14 @@ const state = useConfirmModalState()
 
         <footer class="am-footer">
           <button type="button" class="am-btn am-btn--ghost" @click="cancelAction">Cancel</button>
-          <button type="button" class="am-btn am-btn--primary" @click="confirmAction">Confirm</button>
+          <button
+            type="button"
+            class="am-btn am-btn--primary"
+            :class="{ 'am-btn--primary-customer': state.confirmVariant === 'customer' }"
+            @click="confirmAction"
+          >
+            Confirm
+          </button>
         </footer>
       </section>
     </div>
@@ -92,6 +99,11 @@ const state = useConfirmModalState()
   border: 1px solid #a94442;
   background: #a94442;
   color: #ffffff;
+}
+
+.am-btn--primary-customer {
+  border-color: #d9533c;
+  background: #d9533c;
 }
 
 

@@ -1,50 +1,72 @@
 ﻿<script setup>
-import { onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
-import { api } from '@/api/client'
+import { onMounted, ref } from "vue";
+import { RouterLink } from "vue-router";
+import { api } from "@/api/client";
 
-const pending = ref({ items: [], total: 0 })
-const loading = ref(false)
-const error = ref('')
+const pending = ref({ items: [], total: 0 });
+const loading = ref(false);
+const error = ref("");
 
 async function load() {
-  error.value = ''
-  loading.value = true
+  error.value = "";
+  loading.value = true;
   try {
-    pending.value = await api.listBookingRequests({ status: 'Pending', pageSize: 20 })
+    pending.value = await api.listBookingRequests({
+      status: "Pending",
+      pageSize: 20,
+    });
   } catch (e) {
-    error.value = e?.message || 'Failed to load'
-    pending.value = { items: [], total: 0 }
+    error.value = e?.message || "Failed to load";
+    pending.value = { items: [], total: 0 };
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
-onMounted(load)
+onMounted(load);
 </script>
 
 <template>
   <section class="page">
     <header class="page__header">
-      <h1>Specialist Dashboard</h1>
+      <h1>Welcome</h1>
     </header>
 
-    <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
-
-    <div class="card">
-      <div class="title">Pending Requests</div>
-      <p v-if="loading" class="muted">Loading…</p>
-      <p v-else class="stat">
-        <span class="num">{{ pending.total ?? (pending.items || []).length }}</span>
-        <span class="muted">items</span>
-      </p>
-      <RouterLink class="link" :to="{ name: 'specialist.requests' }">Go to Requests</RouterLink>
+    <div v-if="error" class="banner banner--error" role="alert">
+      {{ error }}
     </div>
 
+    <section class="summary-card">
+      <div class="summary-card__title">Request Overview</div>
+      <div class="summary-grid summary-grid--single">
+        <div class="metric-item">
+          <div class="metric-main">
+            <div class="num">
+              {{
+                loading ? "…" : (pending.total ?? (pending.items || []).length)
+              }}
+            </div>
+            <div class="label">Pending Requests</div>
+          </div>
+          <div class="metric-action">
+            <RouterLink class="link" :to="{ name: 'specialist.requests' }"
+              >Go to Requests</RouterLink
+            >
+          </div>
+        </div>
+      </div>
+    </section>
+
     <ul v-if="(pending.items || []).length" class="preview">
-      <li v-for="b in pending.items.slice(0, 5)" :key="b.id" class="preview__row">
+      <li
+        v-for="b in pending.items.slice(0, 5)"
+        :key="b.id"
+        class="preview__row"
+      >
         <span class="mono">{{ b.id }}</span>
-        <span class="muted small">{{ b.customerName ?? b.customerId ?? '—' }}</span>
+        <span class="muted small">{{
+          b.customerName ?? b.customerId ?? "—"
+        }}</span>
         <span class="small">{{ b.time ?? b.startTime }}</span>
       </li>
     </ul>
@@ -52,39 +74,107 @@ onMounted(load)
 </template>
 
 <style scoped>
+.page__header {
+  margin: 8px 0 20px;
+  padding: 0;
+}
+
 .page__header h1 {
-  margin: 0 0 6px;
-  font-size: 22px;
+  margin: 0;
+  font-size: clamp(32px, 3.1vw, 38px);
+  font-weight: 800;
+  line-height: 1.12;
 }
 .muted {
-  opacity: 0.8;
+  color: #6b7280;
 }
 .small {
   font-size: 12px;
 }
 .card {
-  margin-top: 14px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  margin-top: 10px;
+  padding: 16px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.06);
 }
 .title {
   font-weight: 700;
   margin-bottom: 8px;
-}
-.stat {
-  margin: 0 0 10px;
+  font-size: 16px;
 }
 .num {
-  font-size: 28px;
+  font-size: clamp(44px, 5vw, 56px);
   font-weight: 800;
+  margin: 0;
+  line-height: 1;
 }
 .link {
-  color: inherit;
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 0;
+  border: 1px solid #000000;
+  background: #000000;
+  color: #ffffff;
+  font-size: 14px;
   font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration: none;
+}
+.summary-card {
+  margin-top: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 0;
+  padding: 16px;
+  box-shadow: 0 6px 16px rgba(17, 24, 39, 0.06);
+}
+
+.summary-card__title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+
+.summary-grid--single {
+  grid-template-columns: 1fr;
+}
+
+.metric-item {
+  padding: 14px 18px 12px;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 68%;
+  min-width: 220px;
+  max-width: 100%;
+}
+
+.label {
+  font-size: 14px;
+  opacity: 0.85;
+  font-weight: 600;
+  line-height: 1.25;
+  flex: 1;
+}
+
+.metric-action {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  padding-right: 14px;
 }
 .preview {
   margin: 12px 0 0;
@@ -98,9 +188,9 @@ onMounted(load)
   grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
   padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0;
+  border: 1px solid #eceff3;
+  background: #fafafa;
   font-size: 13px;
 }
 .mono {

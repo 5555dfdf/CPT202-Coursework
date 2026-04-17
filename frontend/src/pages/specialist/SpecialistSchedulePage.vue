@@ -104,15 +104,20 @@ onMounted(() => {
 
     <div class="card">
       <div class="title">Search Filters</div>
-      <label class="field">
-        <span class="label">Specialist ID</span>
-        <input v-model="specialistId" class="input" placeholder="sp-1" />
-      </label>
-      <label class="field">
-        <span class="label">Date</span>
-        <input v-model="slotDate" type="date" class="input" />
-      </label>
-      <button type="button" class="btn" :disabled="loading" @click="loadSlots">Refresh</button>
+      <div class="filters-grid">
+        <label class="field field--specialist">
+          <span class="label">Specialist ID</span>
+          <input v-model="specialistId" class="input" placeholder="sp-1" />
+        </label>
+        <label class="field field--date">
+          <span class="label">Date</span>
+          <input v-model="slotDate" type="date" class="input" />
+        </label>
+        <div class="field field--refresh">
+          <span class="label label--ghost">Action</span>
+          <button type="button" class="btn" :disabled="loading" @click="loadSlots">Refresh</button>
+        </div>
+      </div>
     </div>
 
     <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
@@ -121,32 +126,44 @@ onMounted(() => {
       <div class="title">Available Slots</div>
       <p v-if="loading" class="muted">Loading…</p>
 
-      <ul v-else-if="slots.length" class="slots">
-        <li v-for="sl in slots" :key="sl.slotId ?? sl.id" class="slot">
-          <div class="slot__time">
-            <span>{{ sl.start ?? sl.startTime }}</span>
-            <span>—</span>
-            <span>{{ sl.end ?? sl.endTime }}</span>
-          </div>
-
-          <div class="slot__info">
-            <span v-if="sl.bookingId && sl.customerName" class="customer-name">{{ sl.customerName }}</span>
-            <span v-if="sl.status" class="badge" :class="getStatusClass(sl.status)">{{ sl.status }}</span>
-            <span v-else-if="sl.available === false" class="muted small">Full</span>
-            <span v-else class="muted small">Available</span>
-          </div>
-
-          <button
-              v-if="sl.bookingId && sl.status === 'Confirmed'"
-              type="button"
-              class="btn-complete"
-              :disabled="busySlotId === (sl.slotId ?? sl.id)"
-              @click="handleComplete(sl.slotId ?? sl.id, sl.bookingId)"
-          >
-            {{ busySlotId === (sl.slotId ?? sl.id) ? '...' : 'Complete' }}
-          </button>
-        </li>
-      </ul>
+      <div v-else-if="slots.length" class="slots-table-wrap">
+        <table class="slots-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Customer</th>
+              <th>Status</th>
+              <th class="th-action">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="sl in slots" :key="sl.slotId ?? sl.id">
+              <td>
+                <span>{{ sl.start ?? sl.startTime }}</span>
+                <span> — </span>
+                <span>{{ sl.end ?? sl.endTime }}</span>
+              </td>
+              <td>{{ sl.bookingId && sl.customerName ? sl.customerName : '—' }}</td>
+              <td>
+                <span v-if="sl.status" class="badge" :class="getStatusClass(sl.status)">{{ sl.status }}</span>
+                <span v-else-if="sl.available === false" class="muted small">Full</span>
+                <span v-else class="muted small">Available</span>
+              </td>
+              <td class="cell-action">
+                <button
+                  v-if="sl.bookingId && sl.status === 'Confirmed'"
+                  type="button"
+                  class="btn-complete"
+                  :disabled="busySlotId === (sl.slotId ?? sl.id)"
+                  @click="handleComplete(sl.slotId ?? sl.id, sl.bookingId)"
+                >
+                  {{ busySlotId === (sl.slotId ?? sl.id) ? '...' : 'Complete' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <p v-else-if="!loading && specialistId.trim()" class="muted small">No slots found for this date.</p>
       <p v-else-if="!loading" class="muted small">No data. Enter a specialist ID and select a date.</p>
@@ -155,98 +172,135 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.page__header {
+  margin: 8px 0 20px;
+  padding: 0;
+}
+
 .page__header h1 {
-  margin: 0 0 6px;
-  font-size: 22px;
+  margin: 0;
+  font-size: clamp(32px, 3.1vw, 38px);
+  font-weight: 800;
+  line-height: 1.12;
 }
 .muted {
-  opacity: 0.8;
+  color: #6b7280;
 }
 .small {
   font-size: 12px;
 }
 .card {
   margin-top: 14px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  padding: 16px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.06);
 }
 .title {
   font-weight: 700;
   margin-bottom: 10px;
+  font-size: 16px;
 }
 .field {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 10px;
   max-width: 420px;
 }
+.filters-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr) 140px;
+  grid-template-areas: "specialist date refresh";
+  gap: 10px 16px;
+  align-items: end;
+}
+.field--specialist {
+  grid-area: specialist;
+  margin-bottom: 0;
+  max-width: none;
+}
+.field--date {
+  grid-area: date;
+  margin-bottom: 0;
+  max-width: none;
+}
+.field--refresh {
+  grid-area: refresh;
+  margin-bottom: 0;
+  max-width: none;
+  justify-self: end;
+  width: 100%;
+}
+.label--ghost {
+  visibility: hidden;
+}
 .label {
   font-size: 13px;
-  opacity: 0.85;
+  color: #4b5563;
+  font-weight: 600;
 }
 .input {
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: #ffffff;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 0;
+  border: 1px solid #d8d1cb;
+  background: #f8f5f2;
   color: #111827;
 }
 .btn {
-  padding: 10px 16px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.1);
-  color: inherit;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 0;
+  border: 1px solid #a94442;
+  background: #a94442;
+  color: #ffffff;
+  font-weight: 700;
   cursor: pointer;
 }
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
 }
-.slots {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 6px;
+.slots-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #eceff3;
+  background: #ffffff;
 }
-.slot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
+.slots-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+.slots-table th,
+.slots-table td {
+  border-bottom: 1px solid #eceff3;
+  padding: 12px 14px;
+  text-align: center;
   font-size: 14px;
 }
-.slot__time {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 180px;
-  font-weight: 500;
+.slots-table th {
+  font-size: 12px;
+  color: #111827;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #fafafa;
 }
-.slot__info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.slots-table tbody tr:last-child td {
+  border-bottom: 0;
 }
-.customer-name {
-  font-weight: 600;
-  color: #60a5fa;
-  font-size: 13px;
+.th-action,
+.cell-action {
+  width: 130px;
+  text-align: center;
 }
 .badge {
   display: inline-block;
   font-size: 11px;
   font-weight: 700;
   padding: 2px 8px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  border: 1px solid #d8d1cb;
+  background: #f8f5f2;
 }
 .badge--confirmed {
   background: rgba(52, 211, 153, 0.15);
@@ -282,28 +336,38 @@ onMounted(() => {
 
 .btn-complete {
   margin-left: auto;
-  padding: 6px 14px;
-  border-radius: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 0;
   font-size: 13px;
-  font-weight: 600;
-  background: #10b981;
-  color: white;
-  border: none;
+  font-weight: 700;
+  background: #a94442;
+  color: #ffffff;
+  border: 1px solid #a94442;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: opacity 0.18s ease;
 }
 
 .btn-complete:hover:not(:disabled) {
-  background: #059669;
-  transform: translateY(-1px);
-}
-
-.btn-complete:active:not(:disabled) {
-  transform: translateY(0);
+  opacity: 0.92;
 }
 
 .btn-complete:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 980px) {
+  .filters-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "specialist"
+      "date"
+      "refresh";
+  }
+
+  .field--refresh {
+    justify-self: start;
+  }
 }
 </style>

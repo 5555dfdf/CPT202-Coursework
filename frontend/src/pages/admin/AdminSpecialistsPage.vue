@@ -1444,6 +1444,9 @@ watch(
 
 .modal-card {
   width: min(100%, 680px);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: #ffffff;
   border: 1px solid rgba(17, 24, 39, 0.1);
   border-radius: 0;

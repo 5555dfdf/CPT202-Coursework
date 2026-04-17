@@ -131,35 +131,45 @@ function onReject(id) {
 </template>
 
 <style scoped>
+.page__header {
+  margin: 8px 0 20px;
+  padding: 0;
+}
+
 .page__header h1 {
-  margin: 0 0 6px;
-  font-size: 22px;
+  margin: 0;
+  font-size: clamp(32px, 3.1vw, 38px);
+  font-weight: 800;
+  line-height: 1.12;
 }
 .toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
   gap: 12px;
-  margin-top: 14px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  margin-top: 10px;
+  padding: 16px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.06);
 }
 .field {
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 .label {
   font-size: 13px;
-  opacity: 0.85;
+  color: #4b5563;
+  font-weight: 600;
 }
 .input {
   min-width: 160px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: #ffffff;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 0;
+  border: 1px solid #d8d1cb;
+  background: #f8f5f2;
   color: #111827;
 }
 .input--sm {
@@ -167,37 +177,43 @@ function onReject(id) {
   flex: 1;
 }
 .btn {
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  color: inherit;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 0;
+  border: 1px solid #a94442;
+  background: #a94442;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
 }
 .btn--ok {
-  border-color: rgba(52, 211, 153, 0.45);
-  background: rgba(52, 211, 153, 0.12);
+  border-color: #202124;
+  background: #ffffff;
+  color: #202124;
 }
 .btn--danger {
-  border-color: rgba(248, 113, 113, 0.45);
-  background: rgba(248, 113, 113, 0.12);
+  border-color: #a94442;
+  background: #ffffff;
+  color: #a94442;
 }
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
 }
 .muted {
-  opacity: 0.8;
+  color: #6b7280;
 }
 .small {
   font-size: 12px;
   margin-top: 4px;
 }
 .card {
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  padding: 16px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.06);
 }
 .list {
   margin: 14px 0 0;
@@ -235,8 +251,9 @@ function onReject(id) {
   font-size: 12px;
   font-weight: 700;
   padding: 2px 8px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  border: 1px solid #d8d1cb;
+  background: #f8f5f2;
 }
 .banner {
   margin-top: 14px;
@@ -252,8 +269,9 @@ function onReject(id) {
 .empty {
   margin-top: 16px;
   padding: 18px;
-  border: 1px dashed rgba(255, 255, 255, 0.16);
-  border-radius: 14px;
+  border: 1px dashed #d1d5db;
+  border-radius: 0;
+  background: #fafafa;
 }
 .empty__title {
   font-weight: 700;
