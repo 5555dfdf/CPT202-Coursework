@@ -194,6 +194,7 @@ export const api = {
 
   listBookingRequests: (params) =>
       request(http.get('/specialist/booking-requests', { params })).then(extractPagePayload),
+  specialistGetBooking: (id) => request(http.get(`/specialist/bookings/${id}`)).then(extractDataPayload),
   confirmBooking: (id) => request(http.post(`/specialist/bookings/${id}/confirm`)).then(extractDataPayload),
   rejectBooking: (id, payload) =>
       request(http.post(`/specialist/bookings/${id}/reject`, payload)).then(extractDataPayload),

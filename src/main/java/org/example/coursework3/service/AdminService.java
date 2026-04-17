@@ -399,11 +399,29 @@ public class AdminService {
         int safePage = page == null || page < 1 ? 1 : page;
         int safePageSize = pageSize == null || pageSize < 1 ? 10 : pageSize;
         List<Booking> bookingList = bookingRepository.findAll();
+        for (Booking booking : bookingList){
+            booking.setTime(setTimeInfo(booking.getSlotId()));
+            booking.setCustomerName(setNameInfo(booking.getCustomerId()));
+            booking.setSpecialistName(setNameInfo(booking.getSpecialistId()));
+        }
         int total = bookingList.size();
         int start = Math.min((safePage - 1) * safePageSize, total);
         int end = Math.min(start + safePageSize, total);
         List<Booking> pageItems = bookingList.subList(start, end);
         return BookingPageResult.of(pageItems, total, safePage, safePageSize);
+    }
+
+    public String setTimeInfo(String slotId){
+        DateTimeFormatter timeFmtDate = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        DateTimeFormatter timeFmtTime = DateTimeFormatter.ofPattern("HH:mm");
+        Slot slot = slotRepository.getSlotById(slotId);
+        return slot.getStartTime().toLocalDate().format(timeFmtDate) + " " + slot.getStartTime().toLocalTime().format(timeFmtTime) + "-" +
+                slot.getEndTime().toLocalTime().format(timeFmtTime);
+    }
+
+    public String setNameInfo(String userId){
+        User user = userRepository.getUserById(userId);
+        return user.getName();
     }
 
     @Transactional

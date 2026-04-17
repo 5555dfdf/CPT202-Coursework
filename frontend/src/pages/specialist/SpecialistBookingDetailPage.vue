@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { onMounted, onUnmounted, ref, watch } from "vue";
+import { ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "@/api/client";
 import { showConfirmModal } from "@/ui/confirmModal.js";
@@ -14,12 +14,21 @@ const error = ref("");
 const rejectReason = ref("");
 const busy = ref("");
 
+function formatPrice(row) {
+  const direct = row?.price;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+  const n = Number(row?.amount ?? 0);
+  const safe = Number.isNaN(n) ? 0 : n;
+  const c = String(row?.currency ?? "CNY").trim() || "CNY";
+  return `${safe.toFixed(2)} ${c}`;
+}
+
 async function load() {
   error.value = "";
   loading.value = true;
   booking.value = null;
   try {
-    booking.value = await api.getBooking(props.id);
+    booking.value = await api.specialistGetBooking(props.id);
   } catch (e) {
     error.value = e?.message || "Failed to load";
   } finally {
@@ -59,14 +68,16 @@ function run(action) {
       busy.value = action;
       try {
         if (action === "confirm") {
-          booking.value = await api.confirmBooking(props.id);
+          await api.confirmBooking(props.id);
         } else if (action === "reject") {
-          booking.value = await api.rejectBooking(props.id, {
+          await api.rejectBooking(props.id, {
             reason: rejectReason.value.trim() || undefined,
           });
+          rejectReason.value = "";
         } else if (action === "complete") {
-          booking.value = await api.completeBooking(props.id);
+          await api.completeBooking(props.id);
         }
+        await load();
       } catch (e) {
         error.value = e?.message || "Operation failed";
       } finally {
@@ -75,33 +86,6 @@ function run(action) {
     },
   });
 }
-
-let autoUpdateTimer = null;
-
-async function handleAutoStatusUpdate() {
-  try {
-    const message = await api.triggerAutoStatusUpdate();
-    if (message) {
-      console.log(message);
-      await load();
-    }
-  } catch (e) {
-    console.error("Auto status update failed:", e?.message);
-  }
-}
-
-onMounted(() => {
-  handleAutoStatusUpdate();
-
-  autoUpdateTimer = setInterval(handleAutoStatusUpdate, 3600000);
-});
-
-onUnmounted(() => {
-  if (autoUpdateTimer) {
-    clearInterval(autoUpdateTimer);
-    autoUpdateTimer = null;
-  }
-});
 </script>
 
 <template>
@@ -129,6 +113,10 @@ onUnmounted(() => {
           <dd>
             {{ booking.duration ?? booking.slot ?? booking.slotId ?? "—" }}
           </dd>
+          <dt>Price</dt>
+          <dd>{{ formatPrice(booking) }}</dd>
+          <dt>Note</dt>
+          <dd>{{ booking.note ?? "—" }}</dd>
         </dl>
       </div>
 

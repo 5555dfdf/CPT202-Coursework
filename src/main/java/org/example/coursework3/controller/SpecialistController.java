@@ -9,6 +9,7 @@ import org.example.coursework3.service.AdminService;
 import org.example.coursework3.service.AuthService;
 import org.example.coursework3.service.SpecialistBookingService;
 import org.example.coursework3.vo.AdminSlotVo;
+import org.example.coursework3.vo.SingleBookingVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -57,6 +58,13 @@ public class SpecialistController {
         return Result.success(actionResult);
     }
 
+    @GetMapping("bookings/{id}")
+    public Result<SingleBookingVo> getSingleBookingInfo(@RequestHeader("Authorization") String authHeader, @PathVariable String id){
+        if (!authService.verifyAsSpecialist(authHeader)) {
+            return Result.error("ERROR", "请以专家身份查看");
+        }
+        return Result.success(bookingService.getSingleBookingInfo(id));
+    }
     @PostMapping("/slots")
     public Result<AdminSlotVo> createSlot(@RequestHeader("Authorization") String authHeader,
                                           @RequestBody SlotRequest request) {

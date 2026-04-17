@@ -5,6 +5,7 @@ import org.example.coursework3.entity.Booking;
 import org.example.coursework3.entity.Slot;
 
 import java.math.BigDecimal;
+import java.time.format.DateTimeFormatter;
 
 @Data
 public class SlotVo {
@@ -24,8 +25,8 @@ public class SlotVo {
     public static SlotVo fromSlot(Slot slot, Booking booking, String customerName) {
         SlotVo vo = new SlotVo();
         vo.setSlotId(slot.getId());
-        vo.setStart(slot.getStartTime().toString());
-        vo.setEnd(slot.getEndTime().toString());
+        vo.setStart(slot.getStartTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        vo.setEnd(slot.getEndTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         vo.setAvailable(slot.getAvailable());
         vo.setAmount(slot.getAmount());
         vo.setCurrency(slot.getCurrency());

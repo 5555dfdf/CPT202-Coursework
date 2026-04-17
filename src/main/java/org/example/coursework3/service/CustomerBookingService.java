@@ -125,7 +125,13 @@ public class CustomerBookingService {
         Slot slot = slotRepository.getSlotById(booking.getSlotId());
         User specialist = userRepository.findById(booking.getSpecialistId());
         String specialistName = specialist != null ? specialist.getName() : booking.getSpecialistId();
-        return SingleBookingVo.fromBooking(booking, slot, specialistName);
+        String customerName = setNameInfo(booking.getCustomerId());
+        return SingleBookingVo.fromBooking(booking, slot, specialistName ,customerName);
+    }
+
+    public String setNameInfo(String userId){
+        User user = userRepository.getUserById(userId);
+        return user.getName();
     }
 
     @Transactional
