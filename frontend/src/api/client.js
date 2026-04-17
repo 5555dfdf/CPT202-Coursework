@@ -178,6 +178,21 @@ export const api = {
   logout: () => request(http.post('/auth/logout')),
   getMe: () => request(http.get('/me')).then(normalizeMeResponse),
   updateMe: (payload) => request(http.patch('/me', payload)).then(normalizeMeResponse),
+  verifyMyPassword: (payload) => request(http.post('/me/verify-password', payload)),
+  changeMyPassword: async (payload) => {
+    const candidates = ['/me/change-password', '/me/password', '/auth/change-password']
+    let lastErr = null
+    for (const url of candidates) {
+      try {
+        return await request(http.post(url, payload))
+      } catch (e) {
+        lastErr = e
+        if (e?.status === 403 || e?.status === 404 || e?.status === 405) continue
+        throw e
+      }
+    }
+    throw lastErr ?? new Error('Failed to change password')
+  },
 
   listExpertise: () => request(http.get('/expertise')).then(extractListPayload),
   listSpecialists: (params) => request(http.get('/specialists', { params })).then(extractPagePayload),
