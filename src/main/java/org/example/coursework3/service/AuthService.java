@@ -22,9 +22,6 @@ public class AuthService {
     private final SpecialistsRepository specialistsRepository;
 
     public boolean verifyAsAdmin(String authHeader){
-//        String token = authHeader.replace("Bearer ", "");
-//        String userId = getUserIdByToken(token);
-//        Role role = getRoleByUserId(userId);
         return getRoleByAuth(authHeader) == Role.Admin;
     }
 

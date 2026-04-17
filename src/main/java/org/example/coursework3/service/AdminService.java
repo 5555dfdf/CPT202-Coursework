@@ -9,6 +9,7 @@ import org.example.coursework3.entity.*;
 import org.example.coursework3.exception.MsgException;
 import org.example.coursework3.repository.*;
 import org.example.coursework3.vo.AdminSlotVo;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,7 @@ public class AdminService {
     private final ExpertiseRepository expertiseRepository;
     private final SlotRepository slotRepository;
     private final BookingRepository bookingRepository;
+    private final StringRedisTemplate redisTemplate;
 
     @Transactional
     public Specialist createSpecialist(CreateSpecialistRequest request) {
@@ -103,8 +105,27 @@ public class AdminService {
             throw new MsgException("该专家不存在");
         }
         specialist.setStatus(status);
+        deleteTokenByUserId(id);
         specialistsRepository.save(specialist);
         return specialist;
+    }
+
+    public void deleteTokenByUserId(String userId) {
+
+        String userKey = "auth:user:" + userId;
+
+        // 1. 获取当前用户对应的 token
+        String token = redisTemplate.opsForValue().get(userKey);
+
+        if (token != null) {
+            String tokenKey = "auth:token:" + token;
+
+            // 2. 删除 token -> userId
+            redisTemplate.delete(tokenKey);
+        }
+
+        // 3. 删除 userId -> token
+        redisTemplate.delete(userKey);
     }
 
     @Transactional
