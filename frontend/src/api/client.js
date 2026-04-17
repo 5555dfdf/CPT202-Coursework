@@ -221,6 +221,15 @@ export const api = {
       request(http.delete(`/admin/expertise/${id}`)).then(extractDataPayload),
 
   quotePricing: (payload) => request(http.post('/pricing/quote', payload)).then(extractDataOrListPayload),
+  adminListPricingRules: (params) =>
+      request(http.get('/admin/pricing-rules', { params })).then(extractListPayload),
+  adminGetPricingRule: (id) => request(http.get(`/admin/pricing-rules/${id}`)).then(extractDataPayload),
+  adminCreatePricingRule: (payload) =>
+      request(http.post('/admin/pricing-rules', payload)).then(extractDataPayload),
+  adminUpdatePricingRule: (id, payload) =>
+      request(http.patch(`/admin/pricing-rules/${id}`, payload)).then(extractDataPayload),
+  adminDeletePricingRule: (id) =>
+      request(http.delete(`/admin/pricing-rules/${id}`)).then(extractDataPayload),
 
   // Specialist slot management
   specialistListSlots: (params) => request(http.get('/specialist/slots', { params })).then(extractListPayload),

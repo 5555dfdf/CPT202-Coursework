@@ -1,7 +1,10 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { showAlertModal } from '@/ui/alertModal'
+
+const router = useRouter()
 
 const specialistId = ref('')
 const resolvedSpecialistId = ref('')
@@ -17,11 +20,41 @@ const history = ref([])
 const specialists = ref([])
 const specialistsLoading = ref(false)
 
+const ruleSearchQuery = ref('')
+const rules = ref([])
+const rulesLoading = ref(false)
+const searchedRulesOnce = ref(false)
+const deletingRuleId = ref('')
+const updateLoading = ref(false)
+
+const ruleSearchForm = ref({
+  specialistId: '',
+  duration: '',
+  type: ''
+})
+
+const editOpen = ref(false)
+const editForm = ref({
+  id: '',
+  specialistId: '',
+  duration: 60,
+  type: 'online',
+  amount: '0.00',
+  currency: 'CNY',
+  detail: ''
+})
+
 const durationOptions = [30, 45, 60, 90]
 const sessionTypeOptions = [
-  { label: 'Online', value: 'online' },
-  { label: 'Offline', value: 'offline' }
+  { label: 'online', value: 'online' },
+  { label: 'offline', value: 'offline' }
 ]
+
+const specialistMap = computed(() => {
+  return new Map(
+    specialists.value.map((row) => [String(row?.id ?? '').trim(), String(row?.name ?? '').trim()])
+  )
+})
 
 const hasDuration = computed(() => {
   const mins = Number(duration.value)
@@ -32,21 +65,37 @@ const hasType = computed(() => !!String(type.value || '').trim())
 const hasQuote = computed(() => resultMode.value === 'single' && !!quote.value)
 const hasResultList = computed(() => resultMode.value === 'list' && quoteResults.value.length > 0)
 const isListMode = computed(() => resultMode.value === 'list')
-const resultCountLabel = computed(() => {
-  const count = quoteResults.value.length
-  return `${count} result${count === 1 ? '' : 's'}`
+const resultCountLabel = computed(() => `${quoteResults.value.length} result${quoteResults.value.length === 1 ? '' : 's'}`)
+const ruleCountLabel = computed(() => `${rules.value.length} rule${rules.value.length === 1 ? '' : 's'}`)
+
+const filteredRules = computed(() => {
+  const query = ruleSearchQuery.value.trim().toLowerCase()
+  if (!query) return rules.value
+
+  return rules.value.filter((row) => {
+    const haystack = [
+      ruleId(row),
+      formatSpecialistLabel(ruleSpecialistId(row)),
+      ruleDuration(row),
+      formatTypeLabel(ruleType(row)),
+      ruleAmount(row),
+      ruleCurrency(row),
+      ruleDetail(row)
+    ]
+      .join(' ')
+      .toLowerCase()
+
+    return haystack.includes(query)
+  })
 })
 
 const quoteAmount = computed(
   () => quote.value?.amount ?? quote.value?.totalAmount ?? quote.value?.total ?? quote.value?.price ?? null
 )
 const quoteCurrency = computed(() => quote.value?.currency ?? 'USD')
-const quoteSpecialist = computed(() => {
-  return buildSpecialistLabel(
-    quote.value?.specialistId ?? resolvedSpecialistId.value ?? specialistId.value.trim(),
-    resolvedSpecialistName.value
-  )
-})
+const quoteSpecialist = computed(() =>
+  buildSpecialistLabel(quote.value?.specialistId ?? resolvedSpecialistId.value ?? specialistId.value.trim(), resolvedSpecialistName.value)
+)
 const quoteDuration = computed(() => {
   const fallback = Number(duration.value)
   const value = quote.value?.duration ?? (Number.isFinite(fallback) ? fallback : null)
@@ -64,14 +113,18 @@ const previewHint = computed(() => {
 })
 const emptyPreviewMessage = computed(() => {
   if (loading.value) return 'Calculating quotes...'
-  if (resultMode.value === 'list') {
-    return 'No available quote combinations were found for the current specialist and filters.'
-  }
+  if (resultMode.value === 'list') return 'No available quote combinations were found for the current specialist and filters.'
   return 'Enter a specialist only to browse all available quote combinations, or add duration and session type for a single exact quote.'
 })
 
 function getTypeOrder(value) {
   return sessionTypeOptions.findIndex((option) => option.value === value)
+}
+
+function normalizeAmountInput(value) {
+  if (value === null || value === undefined || value === '') return 0
+  const num = Number(value)
+  return Number.isNaN(num) ? 0 : num
 }
 
 function formatTypeLabel(value) {
@@ -90,6 +143,12 @@ function buildSpecialistLabel(idValue, nameValue = '') {
   const name = String(nameValue || '').trim()
   if (name && id) return `${name} (${id})`
   return name || id || '--'
+}
+
+function formatSpecialistLabel(idValue) {
+  const id = String(idValue || '').trim()
+  const name = specialistMap.value.get(id) || ''
+  return buildSpecialistLabel(id, name)
 }
 
 function formatCurrency(amountValue, currencyValue = 'USD') {
@@ -138,8 +197,8 @@ async function loadSpecialists() {
     const page = await api.listSpecialists({ pageSize: 100 })
     specialists.value = Array.isArray(page?.items) ? page.items : []
   } catch (e) {
-    showAlertModal({ type: 'error', message: e?.message || 'Failed to load specialists' })
     specialists.value = []
+    showAlertModal({ type: 'error', message: e?.message || 'Failed to load specialists' })
   } finally {
     specialistsLoading.value = false
   }
@@ -156,20 +215,10 @@ function createQuoteRecord(source, fallback) {
   const summary = buildQuoteSummary(normalizedDuration, normalizedType)
 
   return {
-    id: [
-      fallback.specialistId,
-      normalizedDuration ?? 'na',
-      normalizedType || 'na',
-      amount ?? 'na',
-      currency,
-      detail || summary
-    ].join(':'),
+    id: [fallback.specialistId, normalizedDuration ?? 'na', normalizedType || 'na', amount ?? 'na', currency, detail || summary].join(':'),
     specialistId: String(source?.specialistId ?? fallback.specialistId ?? '').trim(),
     specialistName: fallback.specialistName ?? '',
-    specialistDisplay: buildSpecialistLabel(
-      source?.specialistId ?? fallback.specialistId ?? '',
-      fallback.specialistName ?? ''
-    ),
+    specialistDisplay: buildSpecialistLabel(source?.specialistId ?? fallback.specialistId ?? '', fallback.specialistName ?? ''),
     duration: normalizedDuration,
     type: normalizedType,
     amount,
@@ -214,9 +263,7 @@ function sortQuoteResults(rows) {
 
     const amountA = Number(a.amount)
     const amountB = Number(b.amount)
-    if (Number.isFinite(amountA) && Number.isFinite(amountB) && amountA !== amountB) {
-      return amountA - amountB
-    }
+    if (Number.isFinite(amountA) && Number.isFinite(amountB) && amountA !== amountB) return amountA - amountB
 
     return String(a.specialistId || '').localeCompare(String(b.specialistId || ''))
   })
@@ -270,9 +317,8 @@ async function onQuote() {
   loading.value = true
 
   try {
-    const selectedSpecialist = specialists.value.find(s => s.id === specialistId.value)
+    const selectedSpecialist = specialists.value.find((s) => s.id === specialistId.value)
     const specialistName = selectedSpecialist?.name || ''
-    
     resolvedSpecialistId.value = specialistId.value
     resolvedSpecialistName.value = specialistName
 
@@ -284,7 +330,7 @@ async function onQuote() {
       })
       const records = normalizeQuoteResponse(response, {
         specialistId: specialistId.value,
-        specialistName: specialistName,
+        specialistName,
         duration: Number(duration.value),
         type: String(type.value).trim().toLowerCase()
       })
@@ -313,18 +359,20 @@ async function onQuote() {
     const combinations = buildQuoteCombinations()
     const settled = await Promise.allSettled(
       combinations.map((combo) =>
-        api.quotePricing({
-          specialistId: specialistId.value,
-          duration: combo.duration,
-          type: combo.type
-        }).then((response) =>
-          normalizeQuoteResponse(response, {
+        api
+          .quotePricing({
             specialistId: specialistId.value,
-            specialistName: specialistName,
             duration: combo.duration,
             type: combo.type
           })
-        )
+          .then((response) =>
+            normalizeQuoteResponse(response, {
+              specialistId: specialistId.value,
+              specialistName,
+              duration: combo.duration,
+              type: combo.type
+            })
+          )
       )
     )
 
@@ -350,212 +398,548 @@ async function onQuote() {
   }
 }
 
+function buildRuleSearchParams() {
+  const params = {}
+  if (ruleSearchForm.value.specialistId) params.specialistId = ruleSearchForm.value.specialistId
+  if (ruleSearchForm.value.duration !== '' && Number.isFinite(Number(ruleSearchForm.value.duration))) {
+    params.duration = Number(ruleSearchForm.value.duration)
+  }
+  if (String(ruleSearchForm.value.type || '').trim()) {
+    params.type = String(ruleSearchForm.value.type).trim().toLowerCase()
+  }
+  return params
+}
+
+async function loadRules(options = {}) {
+  const { announceSuccess = false } = options
+  rulesLoading.value = true
+  try {
+    const rows = await api.adminListPricingRules(buildRuleSearchParams())
+    rules.value = Array.isArray(rows) ? rows : []
+    searchedRulesOnce.value = true
+    if (announceSuccess) {
+      showAlertModal({ type: 'success', message: `Loaded ${ruleCountLabel.value}.` })
+    }
+  } catch (e) {
+    rules.value = []
+    searchedRulesOnce.value = true
+    showAlertModal({ type: 'error', message: e?.message || 'Failed to load pricing rules' })
+  } finally {
+    rulesLoading.value = false
+  }
+}
+
+function resetRuleSearchForm() {
+  ruleSearchForm.value = {
+    specialistId: '',
+    duration: '',
+    type: ''
+  }
+}
+
+function ruleId(row) {
+  return String(row?.id ?? '').trim()
+}
+
+function ruleSpecialistId(row) {
+  return String(row?.specialistId ?? '').trim()
+}
+
+function ruleDuration(row) {
+  const mins = Number(row?.duration)
+  return Number.isFinite(mins) && mins > 0 ? `${mins} min` : '--'
+}
+
+function ruleType(row) {
+  return String(row?.type ?? '').trim().toLowerCase() || '--'
+}
+
+function ruleAmount(row) {
+  const amount = row?.amount
+  if (amount === null || amount === undefined || amount === '') return '0.00'
+  const num = Number(amount)
+  if (Number.isNaN(num)) return String(amount)
+  return num.toFixed(2)
+}
+
+function ruleCurrency(row) {
+  return String(row?.currency ?? 'CNY').trim().toUpperCase() || 'CNY'
+}
+
+function ruleDetail(row) {
+  return String(row?.detail ?? '').trim() || '--'
+}
+
+function buildRulePayload(form) {
+  return {
+    specialistId: String(form.specialistId ?? '').trim(),
+    duration: Number(form.duration),
+    type: String(form.type ?? '').trim().toLowerCase(),
+    amount: normalizeAmountInput(form.amount),
+    currency: String(form.currency ?? '').trim().toUpperCase() || 'CNY',
+    detail: String(form.detail ?? '').trim()
+  }
+}
+
+function openEdit(row) {
+  editForm.value = {
+    id: ruleId(row),
+    specialistId: ruleSpecialistId(row),
+    duration: Number(row?.duration ?? 60),
+    type: String(row?.type ?? 'online').trim().toLowerCase(),
+    amount: ruleAmount(row),
+    currency: ruleCurrency(row),
+    detail: String(row?.detail ?? '').trim()
+  }
+  editOpen.value = true
+}
+
+function closeEdit() {
+  if (updateLoading.value) return
+  editOpen.value = false
+  editForm.value = {
+    id: '',
+    specialistId: '',
+    duration: 60,
+    type: 'online',
+    amount: '0.00',
+    currency: 'CNY',
+    detail: ''
+  }
+}
+
+async function onUpdateRule() {
+  if (!editForm.value.id) {
+    showAlertModal({ type: 'error', message: 'Missing pricing rule ID.' })
+    return
+  }
+  if (!editForm.value.specialistId) {
+    showAlertModal({ type: 'error', message: 'Please select a specialist.' })
+    return
+  }
+  if (!Number.isFinite(Number(editForm.value.duration)) || Number(editForm.value.duration) <= 0) {
+    showAlertModal({ type: 'error', message: 'Please enter a valid duration in minutes.' })
+    return
+  }
+  if (!String(editForm.value.type || '').trim()) {
+    showAlertModal({ type: 'error', message: 'Please enter a session type.' })
+    return
+  }
+
+  updateLoading.value = true
+  try {
+    await api.adminUpdatePricingRule(editForm.value.id, buildRulePayload(editForm.value))
+    await loadRules()
+    showAlertModal({ type: 'success', message: `Pricing rule ${editForm.value.id} updated successfully.` })
+    closeEdit()
+  } catch (e) {
+    showAlertModal({ type: 'error', message: e?.message || 'Failed to update pricing rule' })
+  } finally {
+    updateLoading.value = false
+  }
+}
+
+async function onDeleteRule(row) {
+  const id = ruleId(row)
+  if (!id) {
+    showAlertModal({ type: 'error', message: 'This pricing rule is missing an ID and cannot be deleted.' })
+    return
+  }
+
+  const confirmed = window.confirm(`Delete pricing rule "${id}"? This action cannot be undone.`)
+  if (!confirmed) return
+
+  deletingRuleId.value = id
+  try {
+    await api.adminDeletePricingRule(id)
+    await loadRules()
+    showAlertModal({ type: 'success', message: `Pricing rule ${id} deleted successfully.` })
+  } catch (e) {
+    showAlertModal({ type: 'error', message: e?.message || 'Failed to delete pricing rule' })
+  } finally {
+    deletingRuleId.value = ''
+  }
+}
+
 onMounted(async () => {
-  await loadSpecialists()
+  await Promise.all([loadSpecialists(), loadRules()])
 })
 </script>
 
 <template>
   <section class="page">
     <header class="page__header">
-      <h1>Pricing Calculator</h1>
+      <h1>Pricing Rules</h1>
       <p class="subtitle">
-        Calculate consultation pricing based on specialist, duration, and session type.
+        Manage reusable pricing rules for specialists.
       </p>
     </header>
 
-    <div class="calculator-layout">
-      <section class="calc-card setup-card">
-        <div class="panel-head">
-          <div>
-            <h2 class="card-title">Quote Setup</h2>
-            <p class="panel-note">Leave duration or session type unselected to browse available combinations.</p>
-          </div>
+<!--    <div class="calculator-layout">-->
+<!--      <section class="calc-card setup-card">-->
+<!--        <div class="panel-head">-->
+<!--          <div>-->
+<!--            <h2 class="card-title">Quote Setup</h2>-->
+<!--            <p class="panel-note">Leave duration or session type unselected to browse available combinations.</p>-->
+<!--          </div>-->
+<!--        </div>-->
+
+<!--        <div class="setup-card__body">-->
+<!--          <label class="field">-->
+<!--            <span class="label">Specialist</span>-->
+<!--            <select v-model="specialistId" class="input input&#45;&#45;select" :disabled="specialistsLoading">-->
+<!--              <option value="">Select a specialist</option>-->
+<!--              <option v-for="row in specialists" :key="row.id" :value="row.id">-->
+<!--                {{ row.name || row.id }} ({{ row.id }})-->
+<!--              </option>-->
+<!--            </select>-->
+<!--          </label>-->
+
+<!--          <div class="field">-->
+<!--            <div class="field-head">-->
+<!--              <span class="label">Duration</span>-->
+<!--              <span class="field-state" :class="{ 'field-state&#45;&#45;selected': hasDuration }">-->
+<!--                {{ hasDuration ? `${duration} minutes` : 'Not selected' }}-->
+<!--              </span>-->
+<!--            </div>-->
+
+<!--            <div class="option-row">-->
+<!--              <button-->
+<!--                v-for="mins in durationOptions"-->
+<!--                :key="mins"-->
+<!--                type="button"-->
+<!--                class="option-btn"-->
+<!--                :class="{ 'option-btn&#45;&#45;active': Number(duration) === mins }"-->
+<!--                @click="toggleDuration(mins)"-->
+<!--              >-->
+<!--                {{ mins }}m-->
+<!--              </button>-->
+<!--            </div>-->
+
+<!--            <p class="field-hint">-->
+<!--              {{ hasDuration ? 'Click the active option again to clear this filter.' : 'No duration selected yet.' }}-->
+<!--            </p>-->
+<!--          </div>-->
+
+<!--          <div class="field">-->
+<!--            <div class="field-head">-->
+<!--              <span class="label">Session Type</span>-->
+<!--              <span class="field-state" :class="{ 'field-state&#45;&#45;selected': hasType }">-->
+<!--                {{ hasType ? formatTypeLabel(type) : 'Not selected' }}-->
+<!--              </span>-->
+<!--            </div>-->
+
+<!--            <div class="option-row type-row">-->
+<!--              <button-->
+<!--                v-for="option in sessionTypeOptions"-->
+<!--                :key="option.value"-->
+<!--                type="button"-->
+<!--                class="option-btn option-btn&#45;&#45;type"-->
+<!--                :class="{ 'option-btn&#45;&#45;active': type === option.value }"-->
+<!--                @click="toggleType(option.value)"-->
+<!--              >-->
+<!--                {{ option.label }}-->
+<!--              </button>-->
+<!--            </div>-->
+
+<!--            <p class="field-hint">-->
+<!--              {{ hasType ? 'Click the active option again to clear this filter.' : 'No session type selected yet.' }}-->
+<!--            </p>-->
+<!--          </div>-->
+
+<!--          <button type="button" class="btn-primary" :disabled="loading" @click="onQuote">-->
+<!--            {{ loading ? 'Calculating...' : 'Calculate Quote' }}-->
+<!--          </button>-->
+<!--        </div>-->
+<!--      </section>-->
+
+<!--      <section class="calc-card preview-card">-->
+<!--        <div class="panel-head panel-head&#45;&#45;split">-->
+<!--          <div>-->
+<!--            <h2 class="card-title">Quote Preview</h2>-->
+<!--            <p class="panel-note">{{ previewHint }}</p>-->
+<!--          </div>-->
+<!--          <span v-if="isListMode && quoteResults.length" class="result-count">{{ resultCountLabel }}</span>-->
+<!--        </div>-->
+
+<!--        <div class="preview-card__body">-->
+<!--          <template v-if="hasQuote">-->
+<!--            <div class="amount-block">-->
+<!--              <div class="amount-label">Total Price</div>-->
+<!--              <div class="amount">{{ formattedAmount }}</div>-->
+<!--            </div>-->
+
+<!--            <p class="summary">{{ quoteSummary }}</p>-->
+
+<!--            <div v-if="quote.value?.detail" class="detail-copy">{{ quote.value.detail }}</div>-->
+
+<!--            <div class="detail-list">-->
+<!--              <div class="detail-row">-->
+<!--                <span class="detail-key">Specialist</span>-->
+<!--                <span class="detail-value">{{ quoteSpecialist }}</span>-->
+<!--              </div>-->
+<!--              <div class="detail-row">-->
+<!--                <span class="detail-key">Duration</span>-->
+<!--                <span class="detail-value">{{ formatDurationLabel(quoteDuration) }}</span>-->
+<!--              </div>-->
+<!--              <div class="detail-row">-->
+<!--                <span class="detail-key">Session Type</span>-->
+<!--                <span class="detail-value">{{ quoteTypeLabel }}</span>-->
+<!--              </div>-->
+<!--              <div class="detail-row">-->
+<!--                <span class="detail-key">Currency</span>-->
+<!--                <span class="detail-value">{{ quoteCurrency || '&#45;&#45;' }}</span>-->
+<!--              </div>-->
+<!--            </div>-->
+<!--          </template>-->
+
+<!--          <div v-else-if="hasResultList" class="results-list">-->
+<!--            <article v-for="row in quoteResults" :key="row.id" class="result-item">-->
+<!--              <div class="result-item__top">-->
+<!--                <div class="result-item__copy">-->
+<!--                  <div class="result-item__summary">{{ row.summary }}</div>-->
+<!--                  <div v-if="row.detail" class="result-item__detail">{{ row.detail }}</div>-->
+<!--                </div>-->
+<!--                <div class="result-item__amount">{{ formatCurrency(row.amount, row.currency) }}</div>-->
+<!--              </div>-->
+
+<!--              <div class="result-item__meta">-->
+<!--                <div class="detail-row">-->
+<!--                  <span class="detail-key">Specialist</span>-->
+<!--                  <span class="detail-value">{{ row.specialistDisplay }}</span>-->
+<!--                </div>-->
+<!--                <div class="detail-row">-->
+<!--                  <span class="detail-key">Duration</span>-->
+<!--                  <span class="detail-value">{{ formatDurationLabel(row.duration) }}</span>-->
+<!--                </div>-->
+<!--                <div class="detail-row">-->
+<!--                  <span class="detail-key">Session Type</span>-->
+<!--                  <span class="detail-value">{{ formatTypeLabel(row.type) }}</span>-->
+<!--                </div>-->
+<!--                <div class="detail-row">-->
+<!--                  <span class="detail-key">Currency</span>-->
+<!--                  <span class="detail-value">{{ row.currency || '&#45;&#45;' }}</span>-->
+<!--                </div>-->
+<!--              </div>-->
+<!--            </article>-->
+<!--          </div>-->
+
+<!--          <div v-else class="empty-preview">-->
+<!--            {{ emptyPreviewMessage }}-->
+<!--          </div>-->
+<!--        </div>-->
+<!--      </section>-->
+<!--    </div>-->
+
+<!--    <section class="history-card">-->
+<!--      <div class="history-head">-->
+<!--        <div>-->
+<!--          <h2 class="history-title">Recent Calculations</h2>-->
+<!--          <p class="history-note">Temporary history. It resets when the page is refreshed.</p>-->
+<!--        </div>-->
+<!--        <button type="button" class="clear-btn" :disabled="!history.length" @click="clearHistory">-->
+<!--          Clear History-->
+<!--        </button>-->
+<!--      </div>-->
+
+<!--      <div v-if="!history.length" class="history-empty">-->
+<!--        No calculations yet. Successful quotes will appear here.-->
+<!--      </div>-->
+
+<!--      <div v-else class="history-list">-->
+<!--        <article v-for="row in history" :key="row.id" class="history-item">-->
+<!--          <div class="history-main">-->
+<!--            <div class="history-amount">{{ formatCurrency(row.amount, row.currency) }}</div>-->
+<!--            <div class="history-summary">{{ row.summary }}</div>-->
+<!--          </div>-->
+<!--          <div class="history-meta">-->
+<!--            <span><b>Specialist:</b> {{ row.specialistDisplay || row.specialistId || '&#45;&#45;' }}</span>-->
+<!--            <span><b>Duration:</b> {{ formatDurationLabel(row.duration) }}</span>-->
+<!--            <span><b>Type:</b> {{ formatTypeLabel(row.type) }}</span>-->
+<!--            <span><b>Currency:</b> {{ row.currency || '&#45;&#45;' }}</span>-->
+<!--          </div>-->
+<!--        </article>-->
+<!--      </div>-->
+<!--    </section>-->
+
+    <section class="calc-card list-card">
+      <div class="list-toolbar">
+        <div class="toolbar-title">
+          <h2 class="card-title">Pricing Rules</h2>
+          <p class="list-note">
+            Review all saved pricing rules, search by specialist or condition, and edit them inline.
+          </p>
         </div>
-
-        <div class="setup-card__body">
-          <label class="field">
-            <span class="label">Specialist</span>
-            <select v-model="specialistId" class="input input--select" :disabled="specialistsLoading">
-              <option value="">Select a specialist</option>
-              <option v-for="row in specialists" :key="row.id" :value="row.id">
-                {{ row.name || row.id }} ({{ row.id }})
-              </option>
-            </select>
-          </label>
-
-          <div class="field">
-            <div class="field-head">
-              <span class="label">Duration</span>
-              <span class="field-state" :class="{ 'field-state--selected': hasDuration }">
-                {{ hasDuration ? `${duration} minutes` : 'Not selected' }}
-              </span>
-            </div>
-
-            <div class="option-row">
-              <button
-                v-for="mins in durationOptions"
-                :key="mins"
-                type="button"
-                class="option-btn"
-                :class="{ 'option-btn--active': Number(duration) === mins }"
-                @click="toggleDuration(mins)"
-              >
-                {{ mins }}m
-              </button>
-            </div>
-
-            <p class="field-hint">
-              {{ hasDuration ? 'Click the active option again to clear this filter.' : 'No duration selected yet.' }}
-            </p>
-          </div>
-
-          <div class="field">
-            <div class="field-head">
-              <span class="label">Session Type</span>
-              <span class="field-state" :class="{ 'field-state--selected': hasType }">
-                {{ hasType ? formatTypeLabel(type) : 'Not selected' }}
-              </span>
-            </div>
-
-            <div class="option-row type-row">
-              <button
-                v-for="option in sessionTypeOptions"
-                :key="option.value"
-                type="button"
-                class="option-btn option-btn--type"
-                :class="{ 'option-btn--active': type === option.value }"
-                @click="toggleType(option.value)"
-              >
-                {{ option.label }}
-              </button>
-            </div>
-
-            <p class="field-hint">
-              {{ hasType ? 'Click the active option again to clear this filter.' : 'No session type selected yet.' }}
-            </p>
-          </div>
-
-          <button type="button" class="btn-primary" :disabled="loading" @click="onQuote">
-            {{ loading ? 'Calculating...' : 'Calculate Quote' }}
+        <div class="toolbar-actions">
+          <button type="button" class="btn-neutral btn-create-nav" @click="router.push({ name: 'admin.pricingCreate' })">
+            Go to Add New Price Rule
           </button>
-
+          <input
+            v-model.trim="ruleSearchQuery"
+            class="input search-input"
+            type="text"
+            placeholder="Search pricing rules"
+            aria-label="Search pricing rules"
+          />
+          <button type="button" class="btn-neutral btn-refresh" :disabled="rulesLoading" @click="loadRules({ announceSuccess: true })">
+            {{ rulesLoading ? 'Refreshing...' : 'Refresh' }}
+          </button>
         </div>
-      </section>
+      </div>
 
-      <section class="calc-card preview-card">
-        <div class="panel-head panel-head--split">
-          <div>
-            <h2 class="card-title">Quote Preview</h2>
-            <p class="panel-note">{{ previewHint }}</p>
+      <div class="workspace-grid">
+        <section class="search-card">
+          <div class="field-grid field-grid--three">
+            <label class="field">
+              <span class="label">Specialist</span>
+              <select v-model="ruleSearchForm.specialistId" class="input input--select" :disabled="specialistsLoading">
+                <option value="">All specialists</option>
+                <option v-for="row in specialists" :key="row.id" :value="row.id">
+                  {{ formatSpecialistLabel(row.id) }}
+                </option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="label">Duration</span>
+              <input v-model="ruleSearchForm.duration" type="number" min="1" step="1" class="input" placeholder="Any duration" />
+            </label>
+            <label class="field">
+              <span class="label">Type</span>
+              <select v-model="ruleSearchForm.type" class="input input--select">
+                <option value="online">online</option>
+                <option value="offline">offline</option>
+              </select>
+            </label>
           </div>
-          <span v-if="isListMode && quoteResults.length" class="result-count">{{ resultCountLabel }}</span>
+
+          <div class="button-row">
+            <button type="button" class="btn-primary btn-primary--fit" :disabled="rulesLoading" @click="loadRules({ announceSuccess: true })">
+              {{ rulesLoading ? 'Searching...' : 'Search Rules' }}
+            </button>
+            <button type="button" class="btn-neutral" :disabled="rulesLoading" @click="resetRuleSearchForm">
+              Reset Filters
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <div class="toolbar-meta">
+        <span class="meta-pill">{{ ruleCountLabel }}</span>
+      </div>
+
+      <div v-if="rulesLoading && !rules.length" class="state">Loading pricing rules...</div>
+      <div v-else-if="!rules.length" class="state state--empty">
+        {{ searchedRulesOnce ? 'No pricing rules found for the current filters.' : 'Run a search to review pricing rules.' }}
+      </div>
+      <div v-else-if="!filteredRules.length" class="state state--empty">
+        No pricing rules matched your search.
+      </div>
+
+      <div v-else class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Specialist</th>
+              <th scope="col">Duration</th>
+              <th scope="col">Type</th>
+              <th scope="col">Price</th>
+              <th scope="col">Detail</th>
+              <th scope="col" class="th-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in filteredRules" :key="ruleId(row)">
+              <td class="cell--wrap">{{ formatSpecialistLabel(ruleSpecialistId(row)) }}</td>
+              <td>{{ ruleDuration(row) }}</td>
+              <td>{{ formatTypeLabel(ruleType(row)) }}</td>
+              <td>{{ ruleAmount(row) }} {{ ruleCurrency(row) }}</td>
+              <td class="cell--detail" :title="ruleDetail(row)">{{ ruleDetail(row) }}</td>
+              <td>
+                <div class="row-actions">
+                  <button
+                    type="button"
+                    class="action-btn"
+                    :disabled="updateLoading || deletingRuleId === ruleId(row)"
+                    @click="openEdit(row)"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    class="action-btn action-btn--danger"
+                    :disabled="updateLoading || deletingRuleId === ruleId(row)"
+                    @click="onDeleteRule(row)"
+                  >
+                    {{ deletingRuleId === ruleId(row) ? 'Deleting...' : 'Delete' }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div v-if="editOpen" class="modal-backdrop" @click.self="closeEdit">
+      <section class="modal-card">
+        <div class="panel-head">
+          <h3 class="modal-title">Edit Pricing Rule</h3>
         </div>
 
-        <div class="preview-card__body">
-          <template v-if="hasQuote">
-            <div class="amount-block">
-              <div class="amount-label">Total Price</div>
-              <div class="amount">{{ formattedAmount }}</div>
-            </div>
-
-            <p class="summary">{{ quoteSummary }}</p>
-
-            <div v-if="quote.value?.detail" class="detail-copy">{{ quote.value.detail }}</div>
-
-            <div class="detail-list">
-              <div class="detail-row">
-                <span class="detail-key">Specialist</span>
-                <span class="detail-value">{{ quoteSpecialist }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-key">Duration</span>
-                <span class="detail-value">{{ formatDurationLabel(quoteDuration) }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-key">Session Type</span>
-                <span class="detail-value">{{ quoteTypeLabel }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-key">Currency</span>
-                <span class="detail-value">{{ quoteCurrency || '--' }}</span>
-              </div>
-            </div>
-          </template>
-
-          <div v-else-if="hasResultList" class="results-list">
-            <article v-for="row in quoteResults" :key="row.id" class="result-item">
-              <div class="result-item__top">
-                <div class="result-item__copy">
-                  <div class="result-item__summary">{{ row.summary }}</div>
-                  <div v-if="row.detail" class="result-item__detail">{{ row.detail }}</div>
-                </div>
-                <div class="result-item__amount">{{ formatCurrency(row.amount, row.currency) }}</div>
-              </div>
-
-              <div class="result-item__meta">
-                <div class="detail-row">
-                  <span class="detail-key">Specialist</span>
-                  <span class="detail-value">{{ row.specialistDisplay }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-key">Duration</span>
-                  <span class="detail-value">{{ formatDurationLabel(row.duration) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-key">Session Type</span>
-                  <span class="detail-value">{{ formatTypeLabel(row.type) }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-key">Currency</span>
-                  <span class="detail-value">{{ row.currency || '--' }}</span>
-                </div>
-              </div>
-            </article>
+        <div class="detail-list">
+          <div class="detail-row">
+            <span class="detail-key">Rule ID</span>
+            <span class="detail-value mono">{{ editForm.id || '--' }}</span>
           </div>
+        </div>
 
-          <div v-else class="empty-preview">
-            {{ emptyPreviewMessage }}
-          </div>
+        <label class="field">
+          <span class="label">Specialist</span>
+          <select v-model="editForm.specialistId" class="input input--select" :disabled="updateLoading">
+            <option value="">Select a specialist</option>
+            <option v-for="row in specialists" :key="row.id" :value="row.id">
+              {{ formatSpecialistLabel(row.id) }}
+            </option>
+          </select>
+        </label>
+
+        <div class="field-grid field-grid--two">
+          <label class="field">
+            <span class="label">Duration (minutes)</span>
+            <input v-model="editForm.duration" type="number" min="1" step="1" class="input" />
+          </label>
+          <label class="field">
+            <span class="label">Session Type</span>
+            <input v-model.trim="editForm.type" type="text" maxlength="20" class="input" />
+          </label>
+        </div>
+
+        <div class="field-grid field-grid--two">
+          <label class="field">
+            <span class="label">Amount</span>
+            <input v-model="editForm.amount" type="number" min="0" step="0.01" class="input" />
+          </label>
+          <label class="field">
+            <span class="label">Currency</span>
+            <input v-model.trim="editForm.currency" type="text" maxlength="10" class="input" />
+          </label>
+        </div>
+
+        <label class="field">
+          <span class="label">Detail</span>
+          <textarea v-model="editForm.detail" class="input input--textarea" rows="3" />
+        </label>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-neutral" :disabled="updateLoading" @click="closeEdit">
+            Cancel
+          </button>
+          <button type="button" class="btn-primary btn-primary--fit modal-save" :disabled="updateLoading" @click="onUpdateRule">
+            {{ updateLoading ? 'Saving...' : 'Save Changes' }}
+          </button>
         </div>
       </section>
     </div>
-
-    <section class="history-card">
-      <div class="history-head">
-        <div>
-          <h2 class="history-title">Recent Calculations</h2>
-          <p class="history-note">Temporary history. It resets when the page is refreshed.</p>
-        </div>
-        <button
-          type="button"
-          class="clear-btn"
-          :disabled="!history.length"
-          @click="clearHistory"
-        >
-          Clear History
-        </button>
-      </div>
-
-      <div v-if="!history.length" class="history-empty">
-        No calculations yet. Successful quotes will appear here.
-      </div>
-
-      <div v-else class="history-list">
-        <article v-for="row in history" :key="row.id" class="history-item">
-          <div class="history-main">
-            <div class="history-amount">{{ formatCurrency(row.amount, row.currency) }}</div>
-            <div class="history-summary">{{ row.summary }}</div>
-          </div>
-          <div class="history-meta">
-            <span><b>Specialist:</b> {{ row.specialistDisplay || row.specialistId || '--' }}</span>
-            <span><b>Duration:</b> {{ formatDurationLabel(row.duration) }}</span>
-            <span><b>Type:</b> {{ formatTypeLabel(row.type) }}</span>
-            <span><b>Currency:</b> {{ row.currency || '--' }}</span>
-          </div>
-        </article>
-      </div>
-    </section>
   </section>
 </template>
 
@@ -586,7 +970,15 @@ onMounted(async () => {
   align-items: start;
 }
 
-.calc-card {
+.workspace-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.calc-card,
+.search-card {
   background: #ffffff;
   border: 1px solid rgba(17, 24, 39, 0.1);
   border-radius: 0;
@@ -610,6 +1002,11 @@ onMounted(async () => {
   padding-right: 4px;
 }
 
+.list-card {
+  margin-top: 14px;
+  max-width: 1160px;
+}
+
 .panel-head {
   margin-bottom: 12px;
 }
@@ -621,7 +1018,8 @@ onMounted(async () => {
   gap: 12px;
 }
 
-.panel-note {
+.panel-note,
+.list-note {
   margin: 4px 0 0;
   color: #6b7280;
   font-size: 12px;
@@ -634,7 +1032,8 @@ onMounted(async () => {
   font-weight: 700;
 }
 
-.result-count {
+.result-count,
+.meta-pill {
   display: inline-flex;
   align-items: center;
   height: 28px;
@@ -651,6 +1050,19 @@ onMounted(async () => {
   display: grid;
   gap: 8px;
   margin-bottom: 14px;
+}
+
+.field-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.field-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field-grid--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .field-head {
@@ -686,17 +1098,25 @@ onMounted(async () => {
 }
 
 .input {
+  width: 100%;
   height: 44px;
   padding: 0 12px;
-  border-radius: 0;
   border: 1px solid #d8d1cb;
+  border-radius: 0;
   background: #f8f5f2;
   color: #111827;
 }
 
+.input--textarea {
+  min-height: 88px;
+  padding: 10px 12px;
+  resize: vertical;
+  font: inherit;
+}
+
 .input--select {
-  cursor: pointer;
   appearance: none;
+  cursor: pointer;
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
   background-position: right 0.5rem center;
   background-repeat: no-repeat;
@@ -733,6 +1153,13 @@ onMounted(async () => {
   color: #ffffff;
 }
 
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
 .btn-primary {
   width: 100%;
   height: 44px;
@@ -745,22 +1172,29 @@ onMounted(async () => {
   cursor: pointer;
 }
 
-.btn-primary:disabled {
+.btn-primary--fit {
+  width: 100%;
+  max-width: 220px;
+}
+
+.btn-primary:disabled,
+.btn-neutral:disabled,
+.clear-btn:disabled,
+.action-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.banner {
-  margin-top: 14px;
-  padding: 10px 12px;
+.btn-neutral {
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid #202124;
   border-radius: 0;
+  background: #ffffff;
+  color: #202124;
   font-size: 13px;
-}
-
-.banner--error {
-  border: 1px solid rgba(248, 113, 113, 0.45);
-  background: rgba(248, 113, 113, 0.12);
-  color: #991b1b;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .amount-block {
@@ -828,12 +1262,14 @@ onMounted(async () => {
   text-align: right;
 }
 
-.results-list {
+.results-list,
+.history-list {
   display: grid;
   gap: 10px;
 }
 
-.result-item {
+.result-item,
+.history-item {
   border: 1px solid #d8d1cb;
   background: #ffffff;
   padding: 14px;
@@ -841,7 +1277,11 @@ onMounted(async () => {
   gap: 12px;
 }
 
-.result-item__top {
+.result-item__top,
+.history-main,
+.list-toolbar,
+.toolbar-actions,
+.history-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -865,22 +1305,25 @@ onMounted(async () => {
   line-height: 1.45;
 }
 
-.result-item__amount {
+.result-item__amount,
+.history-amount {
   font-size: 22px;
   font-weight: 800;
   color: #111827;
   white-space: nowrap;
 }
 
-.result-item__meta {
+.result-item__meta,
+.history-meta {
   border-top: 1px solid #eceff3;
   padding-top: 10px;
   display: grid;
   gap: 8px;
 }
 
-.empty-preview {
-  margin-top: 2px;
+.empty-preview,
+.history-empty,
+.state {
   border: 1px dashed #d1d5db;
   border-radius: 0;
   background: #fafafa;
@@ -899,13 +1342,6 @@ onMounted(async () => {
   box-shadow: none;
 }
 
-.history-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
 .history-title {
   margin: 0;
   font-size: 16px;
@@ -916,6 +1352,17 @@ onMounted(async () => {
   margin: 4px 0 0;
   font-size: 12px;
   color: #6b7280;
+}
+
+.history-summary {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.history-meta {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  font-size: 12px;
+  color: #374151;
 }
 
 .clear-btn {
@@ -930,66 +1377,155 @@ onMounted(async () => {
   cursor: pointer;
 }
 
-.clear-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+.btn-create-nav {
+  min-width: 220px;
+  height: 40px;
 }
 
-.clear-btn:hover:not(:disabled) {
-  filter: brightness(0.92);
+.toolbar-actions {
+  align-items: center;
 }
 
-.history-empty {
-  margin-top: 12px;
-  padding: 14px;
-  border: 1px dashed #d1d5db;
-  background: #fafafa;
-  color: #6b7280;
-  font-size: 13px;
+.toolbar-meta {
+  margin: 12px 0;
 }
 
-.history-list {
-  margin-top: 12px;
-  display: grid;
-  gap: 10px;
+.search-input {
+  width: min(280px, 44vw);
 }
 
-.history-item {
-  border: 1px solid #d8d1cb;
+.btn-refresh {
+  min-width: 0;
+  height: 40px;
+  padding: 0 14px;
+  border-color: #a94442;
+  background: #a94442;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid #eceff3;
   background: #ffffff;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+
+.table th,
+.table td {
   padding: 12px 14px;
-  display: grid;
-  gap: 8px;
+  border-bottom: 1px solid #eceff3;
+  text-align: center;
+  vertical-align: middle;
+  font-size: 13px;
+  color: #111827;
 }
 
-.history-main {
+.table th {
+  background: #fafafa;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.th-actions {
+  min-width: 150px;
+}
+
+.cell--wrap {
+  min-width: 180px;
+}
+
+.cell--detail {
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0 auto;
+}
+
+.row-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
 }
 
-.history-amount {
-  font-size: 20px;
+.action-btn {
+  min-width: 64px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #202124;
+  border-radius: 0;
+  background: #ffffff;
+  color: #202124;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.action-btn--danger {
+  border-color: #a94442;
+  color: #a94442;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(17, 24, 39, 0.42);
+}
+
+.modal-card {
+  width: min(100%, 620px);
+  background: #ffffff;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 0;
+  padding: 18px;
+  box-shadow: 0 16px 36px rgba(17, 24, 39, 0.16);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 18px;
   font-weight: 800;
   color: #111827;
 }
 
-.history-summary {
-  font-size: 13px;
-  color: #4b5563;
+.modal-footer {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
-.history-meta {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px 10px;
-  font-size: 12px;
-  color: #374151;
+.modal-save {
+  max-width: 180px;
 }
 
 @media (max-width: 980px) {
-  .calculator-layout {
+  .calculator-layout,
+  .field-grid--two,
+  .field-grid--three,
+  .history-meta {
     grid-template-columns: 1fr;
   }
 
@@ -1005,20 +1541,23 @@ onMounted(async () => {
     padding-right: 0;
   }
 
-  .history-meta {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
+  .history-head,
   .history-main,
   .result-item__top,
-  .panel-head--split {
+  .panel-head--split,
+  .list-toolbar,
+  .toolbar-actions,
+  .button-row,
+  .modal-footer {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
+    align-items: stretch;
   }
 
-  .history-head {
-    flex-direction: column;
+  .search-input,
+  .btn-primary--fit,
+  .modal-save {
+    width: 100%;
+    max-width: none;
   }
 }
 </style>
