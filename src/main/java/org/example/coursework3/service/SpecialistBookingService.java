@@ -7,6 +7,7 @@ import org.example.coursework3.entity.*;
 import org.example.coursework3.exception.MsgException;
 import org.example.coursework3.repository.*;
 import org.example.coursework3.vo.BookingRequestVo;
+import org.example.coursework3.vo.SingleBookingVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -159,6 +160,19 @@ public class SpecialistBookingService {
         booking.setStatus(BookingStatus.Completed);
         bookingRepository.save(booking);
         return new BookingActionResult(bookingId, BookingStatus.Completed);
+    }
+    public SingleBookingVo getSingleBookingInfo(String bookingId){
+        Booking booking = bookingRepository.getBookingById(bookingId);
+        Slot slot = slotRepository.getSlotById(booking.getSlotId());
+        User specialist = userRepository.findById(booking.getSpecialistId());
+        String specialistName = specialist != null ? specialist.getName() : booking.getSpecialistId();
+        String customerName = setNameInfo(booking.getCustomerId());
+        return SingleBookingVo.fromBooking(booking, slot, specialistName ,customerName);
+    }
+
+    public String setNameInfo(String userId){
+        User user = userRepository.getUserById(userId);
+        return user.getName();
     }
 
     @Transactional

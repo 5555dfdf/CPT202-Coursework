@@ -1,8 +1,10 @@
 ﻿<script setup>
 import { onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { api } from '@/api/client'
 import CustomerBookingDetailPage from '@/pages/customer/CustomerBookingDetailPage.vue'
 
+const route = useRoute()
 const status = ref('')
 const page = ref({ items: [], total: 0, page: 1, pageSize: 10 })
 const query = ref({ from: '', to: '', page: 1, pageSize: 10 })
@@ -81,8 +83,23 @@ function closeDetail() {
   detailBookingId.value = ''
 }
 
+function handleDetailClose(payload) {
+  closeDetail()
+  if (payload?.refresh) {
+    load()
+  }
+}
+
 onMounted(load)
 watch(status, () => onSearch())
+watch(
+  () => route.query.refresh,
+  (v) => {
+    if (v != null && v !== '') {
+      load()
+    }
+  }
+)
 </script>
 
 <template>
@@ -167,7 +184,7 @@ watch(status, () => onSearch())
           v-if="detailBookingId"
           :id="detailBookingId"
           embedded
-          @close="closeDetail"
+          @close="handleDetailClose"
         />
       </section>
     </div>

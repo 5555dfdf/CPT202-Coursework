@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
+import { showAlertModal } from '@/ui/alertModal'
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -67,10 +68,21 @@ async function onCancel() {
       reason: cancelReason.value.trim() || undefined
     })
     if (props.embedded) {
-      emit('close')
+      showAlertModal({
+        type: 'success',
+        message: 'Booking cancelled successfully.',
+        onClose: () => emit('close', { refresh: true })
+      })
     } else {
-      window.alert('Booking cancelled successfully.')
-      await router.push({ name: 'customer.bookings' })
+      showAlertModal({
+        type: 'success',
+        message: 'Booking cancelled successfully.',
+        onClose: () =>
+          router.push({
+            name: 'customer.bookings',
+            query: { refresh: String(Date.now()) }
+          })
+      })
     }
   } catch (e) {
     actionError.value = e?.message || 'Failed to cancel'

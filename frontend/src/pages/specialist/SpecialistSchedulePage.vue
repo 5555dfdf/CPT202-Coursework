@@ -105,10 +105,7 @@ onMounted(() => {
     <div class="card">
       <div class="title">Search Filters</div>
       <div class="filters-grid">
-        <label class="field field--specialist">
-          <span class="label">Specialist ID</span>
-          <input v-model="specialistId" class="input" placeholder="sp-1" />
-        </label>
+        <!-- 只保留日期筛选 -->
         <label class="field field--date">
           <span class="label">Date</span>
           <input v-model="slotDate" type="date" class="input" />
@@ -129,38 +126,38 @@ onMounted(() => {
       <div v-else-if="slots.length" class="slots-table-wrap">
         <table class="slots-table">
           <thead>
-            <tr>
-              <th>Time</th>
-              <th>Customer</th>
-              <th>Status</th>
-              <th class="th-action">Action</th>
-            </tr>
+          <tr>
+            <th>Time</th>
+            <th>Customer</th>
+            <th>Status</th>
+            <th class="th-action">Action</th>
+          </tr>
           </thead>
           <tbody>
-            <tr v-for="sl in slots" :key="sl.slotId ?? sl.id">
-              <td>
-                <span>{{ sl.start ?? sl.startTime }}</span>
-                <span> — </span>
-                <span>{{ sl.end ?? sl.endTime }}</span>
-              </td>
-              <td>{{ sl.bookingId && sl.customerName ? sl.customerName : '—' }}</td>
-              <td>
-                <span v-if="sl.status" class="badge" :class="getStatusClass(sl.status)">{{ sl.status }}</span>
-                <span v-else-if="sl.available === false" class="muted small">Full</span>
-                <span v-else class="muted small">Available</span>
-              </td>
-              <td class="cell-action">
-                <button
+          <tr v-for="sl in slots" :key="sl.slotId ?? sl.id">
+            <td>
+              <span>{{ sl.start ?? sl.startTime }}</span>
+              <span> — </span>
+              <span>{{ sl.end ?? sl.endTime }}</span>
+            </td>
+            <td>{{ sl.bookingId && sl.customerName ? sl.customerName : '—' }}</td>
+            <td>
+              <span v-if="sl.status" class="badge" :class="getStatusClass(sl.status)">{{ sl.status }}</span>
+              <span v-else-if="sl.available === false" class="muted small">Full</span>
+              <span v-else class="muted small">Available</span>
+            </td>
+            <td class="cell-action">
+              <button
                   v-if="sl.bookingId && sl.status === 'Confirmed'"
                   type="button"
                   class="btn-complete"
                   :disabled="busySlotId === (sl.slotId ?? sl.id)"
                   @click="handleComplete(sl.slotId ?? sl.id, sl.bookingId)"
-                >
-                  {{ busySlotId === (sl.slotId ?? sl.id) ? '...' : 'Complete' }}
-                </button>
-              </td>
-            </tr>
+              >
+                {{ busySlotId === (sl.slotId ?? sl.id) ? '...' : 'Complete' }}
+              </button>
+            </td>
+          </tr>
           </tbody>
         </table>
       </div>
@@ -208,17 +205,13 @@ onMounted(() => {
   margin-bottom: 10px;
   max-width: 420px;
 }
+/* 调整后的布局：日期 + 刷新按钮 */
 .filters-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr) 140px;
-  grid-template-areas: "specialist date refresh";
+  grid-template-columns: minmax(260px, 1fr) 140px;
+  grid-template-areas: "date refresh";
   gap: 10px 16px;
   align-items: end;
-}
-.field--specialist {
-  grid-area: specialist;
-  margin-bottom: 0;
-  max-width: none;
 }
 .field--date {
   grid-area: date;
@@ -361,7 +354,6 @@ onMounted(() => {
   .filters-grid {
     grid-template-columns: 1fr;
     grid-template-areas:
-      "specialist"
       "date"
       "refresh";
   }

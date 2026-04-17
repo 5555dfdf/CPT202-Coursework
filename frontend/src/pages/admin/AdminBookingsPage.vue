@@ -67,9 +67,13 @@ function bookingNote(row) {
 }
 
 function formatPrice(value) {
-  const amount = Number(value)
+  if (!value) return '--'
+  const str = String(value)
+  const numericPart = str.replace(/[^0-9.]/g, '')
+  const currencyPart = str.replace(/[0-9.]/g, '').trim()
+  const amount = Number(numericPart)
   if (!Number.isFinite(amount)) return '--'
-  return amount.toFixed(2)
+  return `${amount.toFixed(2)} ${currencyPart || ''}`.trim()
 }
 
 function detailRecord(id) {

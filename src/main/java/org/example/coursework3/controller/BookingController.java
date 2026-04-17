@@ -50,8 +50,8 @@ public class BookingController {
 
     @GetMapping("/{id}")
     public Result<SingleBookingVo> getSingleBookingInfo(@RequestHeader("Authorization") String authHeader, @PathVariable String id){
-        if (!authService.verifyAsCustomer(authHeader) && !authService.verifyAsSpecialist(authHeader)) {
-            return Result.error("ERROR", "请以顾客或专家身份查看");
+        if (!authService.verifyAsCustomer(authHeader)) {
+            return Result.error("ERROR", "请以顾客身份查看");
         }
         return Result.success(bookingService.getSingleBookingInfo(id));
     }
