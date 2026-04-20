@@ -72,14 +72,17 @@ public class AliyunMailService {
 //
 //        client.singleSendMail(request);
 //    }
-
+    // send emails to specialists when the slot is cancelled to notify that the slot is now available
     @Async
     public void sendCancellationNoticeToSpecialist(String toAddress, String slotInfo) throws Exception {
+
+        // email head
         String subject = "Booking Cancellation and Appointment Slot Release Notice";
+        // email body content
         String bodyHtml = "<h3>Booking Cancellation Reminder</h3>" +
                 "<p>Dear specialist, the client has canceled the originally scheduled reservation: <strong>" + slotInfo + "</strong></p>" +
                 "<p><strong>The slot has now been automatically released</strong>, other customers can make a new booking.</p>";
-
+        // initialize the Aliyun Mail request with sender and recipient details
         SingleSendMailRequest request = new SingleSendMailRequest()
                 .setAccountName(fromAddress)
                 .setAddressType(1)
@@ -91,14 +94,18 @@ public class AliyunMailService {
         client.singleSendMail(request);
     }
 
+    // send a generic status update notification to either a customer or a specialist
     @Async
     public void sendGenericStatusNotification(String toAddress, String role, String status, String slotInfo, String note) throws Exception {
+        // email head
         String subject = "Booking Status Update: " + status;
+        // email body content
         String bodyHtml = "<h3>Booking Status Update</h3>" +
                 "<p>Dear " + role + ",</p>" +
                 "<p>The status of the booking for the time slot <strong>" + slotInfo
                 + "</strong> has been updated to: <strong style='color:blue'>" + status
                 + "</strong>.</p>";
+        // Append the optional note
         if (note != null && !note.isEmpty()) {
             bodyHtml += "<p>Note/Reason: " + note + "</p>";
         }

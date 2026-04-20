@@ -55,7 +55,7 @@ public class BookingController {
         }
         return Result.success(bookingService.getSingleBookingInfo(id));
     }
-
+    //cancel bookings
     @PostMapping("/{id}/cancel")
     public Result<BookingActionResult> cancelBooking(@RequestHeader("Authorization") String authHeader, @PathVariable String id){
         if (!authService.verifyAsCustomer(authHeader)) {
@@ -63,7 +63,7 @@ public class BookingController {
         }
         return Result.success(bookingService.cancelBooking(id));
     }
-
+    // reschedule bookings
     @PostMapping("/{id}/reschedule")
     public Result<RescheduleBookingResult> rescheduleBooking(@RequestHeader("Authorization") String authHeader, @PathVariable String id,
                                                              @RequestBody RescheduleBookingRequest request){

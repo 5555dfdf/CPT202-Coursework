@@ -10,6 +10,9 @@ const error = ref('')
 const busyId = ref('')
 const rejectReason = ref('')
 
+/**
+ * Fetch data from the API based on current filter status
+ */
 async function load() {
   error.value = ''
   loading.value = true
@@ -24,8 +27,10 @@ async function load() {
     loading.value = false
   }
 }
-
+// initial load on component mount
 onMounted(load)
+
+// automatically re-fetch data whenever the status filter changes
 watch(status, () => load())
 
 function onConfirm(id) {
@@ -45,7 +50,7 @@ function onConfirm(id) {
     }
   })
 }
-
+// handles the rejection of a booking request
 function onReject(id) {
   showConfirmModal({
     title: 'Refuse Reservation',
@@ -131,6 +136,7 @@ function onReject(id) {
 </template>
 
 <style scoped>
+/* Page & Header Typography */
 .page__header {
   margin: 8px 0 20px;
   padding: 0;
@@ -142,6 +148,7 @@ function onReject(id) {
   font-weight: 800;
   line-height: 1.12;
 }
+/* Filter Toolbar Layout */
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -154,6 +161,7 @@ function onReject(id) {
   background: #ffffff;
   box-shadow: 0 8px 18px rgba(17, 24, 39, 0.06);
 }
+/* Form Fields & Inputs */
 .field {
   display: grid;
   gap: 8px;
@@ -176,6 +184,7 @@ function onReject(id) {
   min-width: 140px;
   flex: 1;
 }
+/* Button Components */
 .btn {
   height: 40px;
   padding: 0 14px;
@@ -201,6 +210,7 @@ function onReject(id) {
 .btn:disabled {
   opacity: 0.55;
 }
+/* Utility Classes */
 .muted {
   color: #6b7280;
 }
@@ -261,6 +271,7 @@ function onReject(id) {
   border-radius: 0;
   font-size: 13px;
 }
+/* Error Banner & Empty State Styling */
 .banner--error {
   border: 1px solid rgba(248, 113, 113, 0.45);
   background: rgba(248, 113, 113, 0.12);

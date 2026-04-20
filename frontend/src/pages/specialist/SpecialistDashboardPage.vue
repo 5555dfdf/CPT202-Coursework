@@ -7,22 +7,26 @@ const pending = ref({ items: [], total: 0 });
 const loading = ref(false);
 const error = ref("");
 
+
+// fetches the list of pending booking requests from the API.
 async function load() {
   error.value = "";
   loading.value = true;
   try {
+    // requesting only "Pending" status bookings with a specific page size
     pending.value = await api.listBookingRequests({
       status: "Pending",
       pageSize: 20,
     });
   } catch (e) {
+    // fallback error handling
     error.value = e?.message || "Failed to load";
     pending.value = { items: [], total: 0 };
   } finally {
     loading.value = false;
   }
 }
-
+// initial data load when the component is mounted to the DOM
 onMounted(load);
 </script>
 
@@ -75,6 +79,7 @@ onMounted(load);
 
 <style scoped>
 .page__header {
+  /* Page Layout */
   margin: 8px 0 20px;
   padding: 0;
 }
@@ -104,12 +109,14 @@ onMounted(load);
   margin-bottom: 8px;
   font-size: 16px;
 }
+/* Flex/Grid layout for metrics */
 .num {
   font-size: clamp(44px, 5vw, 56px);
   font-weight: 800;
   margin: 0;
   line-height: 1;
 }
+/* Action Button/Link */
 .link {
   display: inline-block;
   padding: 8px 14px;
@@ -121,6 +128,7 @@ onMounted(load);
   font-weight: 600;
   text-decoration: none;
 }
+/* Statistic Card Styles */
 .summary-card {
   margin-top: 8px;
   background: #ffffff;
@@ -176,6 +184,7 @@ onMounted(load);
   justify-content: flex-end;
   padding-right: 14px;
 }
+/* Preview List Rows */
 .preview {
   margin: 12px 0 0;
   padding: 0;
@@ -196,6 +205,7 @@ onMounted(load);
 .mono {
   font-family: ui-monospace, monospace;
 }
+/* Feedback Banners */
 .banner {
   margin-top: 14px;
   padding: 10px 12px;
@@ -207,6 +217,7 @@ onMounted(load);
   background: rgba(248, 113, 113, 0.12);
   color: #991b1b;
 }
+/* Responsive adjustments for smaller screens */
 @media (max-width: 640px) {
   .preview__row {
     grid-template-columns: 1fr;

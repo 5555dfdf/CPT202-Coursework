@@ -4,6 +4,8 @@ import { useAuthStore } from '@/stores/auth'
 import { api } from '@/api/client'
 import { showAlertModal } from '@/ui/alertModal'
 import { showConfirmModal } from '@/ui/confirmModal.js'
+
+
 const auth = useAuthStore()
 const specialistId = ref('')
 const slotDate = ref(new Date().toISOString().slice(0, 10))
@@ -11,9 +13,10 @@ const slots = ref([])
 const loading = ref(false)
 const error = ref('')
 const busySlotId = ref('')
-
+// automatically derive the specialist ID from the logged-in user profile
 const hintId = computed(() => auth.user?.specialistId ?? auth.user?.id ?? '')
 
+// initialize specialistId from the auth store whenever hintId becomes available
 watch(
     hintId,
     (v) => {
@@ -23,7 +26,7 @@ watch(
     },
     { immediate: true }
 )
-
+// fetch time slots for the specialist from the backend.
 async function loadSlots() {
   if (!specialistId.value.trim()) {
     slots.value = []
@@ -40,7 +43,8 @@ async function loadSlots() {
     loading.value = false
   }
 }
-
+/*Handles the "Complete" action for a confirmed booking.
+  Opens a confirmation modal before proceeding.*/
 async function handleComplete(slotId, bookingId) {
   if (!bookingId) {
     error.value = 'No booking found for this slot'
@@ -52,7 +56,7 @@ async function handleComplete(slotId, bookingId) {
     message: 'Are you sure that this reservation service has been completed?  \n' +
         'Once confirmed, the status will change to \'Completed\'.',
     onConfirm: async () => {
-      busySlotId.value = slotId
+      busySlotId.value = slotId // disable button for this specific slot
       try {
         await api.completeBooking(bookingId)
 
@@ -62,7 +66,7 @@ async function handleComplete(slotId, bookingId) {
           type: 'success'
         })
 
-        await loadSlots()
+        await loadSlots() // refresh data
       } catch (e) {
         error.value = e?.message || 'Failed to complete booking'
         showAlertModal({
@@ -76,7 +80,7 @@ async function handleComplete(slotId, bookingId) {
     }
   })
 }
-
+// map a status string to a corresponding CSS class for styling badges.
 function getStatusClass(status) {
   if (!status) return ''
   const lowerStatus = status.toLowerCase()
@@ -186,6 +190,8 @@ onMounted(() => {
 .small {
   font-size: 12px;
 }
+
+/* Card & Input Components */
 .card {
   margin-top: 14px;
   padding: 16px;
@@ -205,7 +211,9 @@ onMounted(() => {
   margin-bottom: 10px;
   max-width: 420px;
 }
-/* 调整后的布局：日期 + 刷新按钮 */
+/*Filters Grid Layout
+layout: date + refrash button
+*/
 .filters-grid {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) 140px;
@@ -254,6 +262,9 @@ onMounted(() => {
 .btn:disabled {
   opacity: 0.6;
 }
+/**
+ * Table & Row Styles
+ */
 .slots-table-wrap {
   overflow-x: auto;
   border: 1px solid #eceff3;
@@ -349,7 +360,9 @@ onMounted(() => {
   opacity: 0.5;
   cursor: not-allowed;
 }
-
+/**
+ * Responsive Overrides
+ */
 @media (max-width: 980px) {
   .filters-grid {
     grid-template-columns: 1fr;

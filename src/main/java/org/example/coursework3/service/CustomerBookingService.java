@@ -134,14 +134,19 @@ public class CustomerBookingService {
         return user.getName();
     }
 
+    // Cancel booking
     @Transactional
     public BookingActionResult cancelBooking(String id) {
+        // get booking details by id
         Booking booking = bookingRepository.getBookingById(id);
+        // verify: only bookings in 'Confirmed' or 'Pending' are eligible for cancellation
         if (booking.getStatus() != BookingStatus.Confirmed && booking.getStatus() != BookingStatus.Pending) {
             throw new MsgException("当前预约状态无法执行取消操作");
         }
+        // update booking status to 'cancelled'
         booking.setStatus(BookingStatus.Cancelled);
         bookingRepository.save(booking);
+        // get the cancelled slot and set it available
         Slot slot = slotRepository.getSlotById(booking.getSlotId());
         slot.setAvailable(true);
 
@@ -160,50 +165,57 @@ public class CustomerBookingService {
 
     @Transactional
     public void rescheduleBooking(String bookingId, String newSlotId) {
+        // get booking details
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new MsgException("预约不存在"));
-
+        // check if the current booking status allows rescheduling
         if (booking.getStatus() == BookingStatus.Cancelled || booking.getStatus() == BookingStatus.Completed) {
             throw new MsgException("该预约无法改期");
         }
-
+        // validate new slot existence and availability
         Slot newSlot = slotRepository.findById(newSlotId)
                 .orElseThrow(() -> new MsgException("新时段不存在"));
         if (!newSlot.getAvailable()) {
             throw new MsgException("新时段不可用");
         }
+        // ensure the new slot belongs to the same specialist
         if (!newSlot.getSpecialistId().equals(booking.getSpecialistId())) {
             throw new MsgException("新时段与原专家不匹配");
         }
-
+        // record the rescheduling action in the history database
         BookingHistory history = new BookingHistory();
         history.setBookingId(bookingId);
         history.setStatus(BookingStatus.Rescheduled);
         bookingHistoryRepository.save(history);
-
+        // release the old time slot
         Slot oldSlot = slotRepository.findById(booking.getSlotId()).orElse(null);
         if (oldSlot != null) {
             oldSlot.setAvailable(true);
             slotRepository.save(oldSlot);
         }
+
+        // update the booking with new slot and reset status to 'Pending'
         booking.setSlotId(newSlotId);
         booking.setStatus(BookingStatus.Pending);
         bookingRepository.save(booking);
+
+        // lock the new time slot
         newSlot.setAvailable(false);
         slotRepository.save(newSlot);
 
 
-
+        // send notifications to both parties
         try {
             User customer = userRepository.findById(booking.getCustomerId());
             User specialistUser = userRepository.findById(booking.getSpecialistId());
-
+            // change format of time range for email
             String range = newSlot.getStartTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + " to " +
                     newSlot.getEndTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-
+            // send to customer
             if (customer != null && customer.getEmail() != null) {
                 aliyunMailService.sendGenericStatusNotification(customer.getEmail(), "Customer", "Rescheduled", range, "Your booking has been rescheduled to a new time.");
             }
+            // send to specialist
             if (specialistUser != null && specialistUser.getEmail() != null) {
                 aliyunMailService.sendGenericStatusNotification(specialistUser.getEmail(), "Specialist", "Rescheduled", range, "Customer rescheduled the booking to a new time.");
             }

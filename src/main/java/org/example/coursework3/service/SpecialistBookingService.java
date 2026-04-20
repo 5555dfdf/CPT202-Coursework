@@ -38,13 +38,14 @@ public class SpecialistBookingService {
     private SpecialistsRepository specialistsRepository;
 
     public BookingPageResult getSpecialistBookings(String authHeader, String status, Integer page, Integer pageSize) {
+        // extract and verify specialist identity
         String token = authHeader.replace("Bearer ","");
         String specialistId = authService.getUserIdByToken(token);
         User specialist = userRepository.findById(specialistId);
         if (specialist.getRole() != Role.Specialist){
             throw new MsgException("您不是专家，无权访问");
         }
-        //强转类型 从String -> BookingStatus
+        // parse status string to Enum
         Page<Booking> bookingPage;
         List<BookingRequestVo> voList = null;
         try {
@@ -56,6 +57,7 @@ public class SpecialistBookingService {
                     throw new MsgException("无效的状态值：" + status);
                 }
             }
+            // create page request sorted by creation time descending
             PageRequest pageRequest = PageRequest.of(Math.max(0, page - 1), pageSize, Sort.by(Sort.Direction.DESC, "createdAt"));
             try {
                 if (status1 == null) {
@@ -68,7 +70,7 @@ public class SpecialistBookingService {
             } catch (Exception e) {
                 throw new MsgException("没搜到数据");
             }
-
+            // transform Entity list to VO list with additional user/slot info
             voList = bookingPage.getContent().stream()
                     .map(booking ->{
                         User customer = userRepository.findById(booking.getCustomerId());
@@ -83,19 +85,21 @@ public class SpecialistBookingService {
         return BookingPageResult.of(voList, bookingPage.getTotalElements(),page,pageSize);
     }
 
-
+    // confirm booking - transfer 'Pending' to 'Confirmed'
     public BookingActionResult confirmBooking(String authHeader, String bookingId) {
         String token = authHeader.replace("Bearer ","");
         String specialistId = authService.getUserIdByToken(token);
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(()-> new MsgException("No such reservation"));
         Slot slot = slotRepository.findById(booking.getSlotId()).orElseThrow(() -> new MsgException("No such slot"));
+        // verify if u are a specialist and if the booking status is pending
         if (!booking.getSpecialistId().equals(specialistId)) {
-            throw new MsgException("No right to handle this reservation");
+            throw new MsgException("Without right to handle this reservation");
         }
         if (booking.getStatus() != BookingStatus.Pending){
-            throw new MsgException("Can just handling pending reservations");
+            throw new MsgException("Can only handle pending reservations");
         }
+        // update status
         booking.setStatus(BookingStatus.Confirmed);
         bookingRepository.save(booking);
         //发送邮件逻辑
@@ -108,27 +112,32 @@ public class SpecialistBookingService {
 //        } catch (Exception e) {
 //            log.warn("Failed to send confirmation email notification: {}", e.getMessage());
 //        }
+        // lock the slot
         slot.setAvailable(Boolean.FALSE);
         slotRepository.save(slot);
         return new BookingActionResult(bookingId, BookingStatus.Confirmed);
     }
-
+    // reject booking - transfer 'Pending' to 'Rejected'
     @Transactional
     public BookingActionResult rejectBooking(String authHeader, String bookingId, String reason) {
+
         String token = authHeader.replace("Bearer ","");
         String specialistId = authService.getUserIdByToken(token);
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(()-> new MsgException("No such reservation"));
 
         if (!booking.getSpecialistId().equals(specialistId)) {
-            throw new MsgException("No right to handle this reservation");
+            throw new MsgException("Without right to handle this reservation");
         }
         if (booking.getStatus() != BookingStatus.Pending){
-            throw new MsgException("Can just handling pending reservations");
+            throw new MsgException("Can only handle pending reservations");
         }
+        // update status, set note
         booking.setStatus(BookingStatus.Rejected);
         booking.setNote(reason);
         bookingRepository.save(booking);
+
+        // release the slot
         Slot slot = slotRepository.getById(booking.getSlotId());
         slot.setAvailable(true);
         slotRepository.save(slot);
@@ -144,7 +153,7 @@ public class SpecialistBookingService {
 //        }
         return new BookingActionResult(bookingId, BookingStatus.Rejected);
     }
-
+    // complete booking - transfer 'Confirmed' into 'Completed'
     public BookingActionResult completeBooking(String authHeader, String bookingId) {
         String token = authHeader.replace("Bearer ","");
         String specialistId = authService.getUserIdByToken(token);
@@ -152,15 +161,16 @@ public class SpecialistBookingService {
                 .orElseThrow(()-> new MsgException("No such reservation"));
 
         if (!booking.getSpecialistId().equals(specialistId)) {
-            throw new MsgException("No right to handle this reservation");
+            throw new MsgException("Without right to handle this reservation");
         }
         if (booking.getStatus() != BookingStatus.Confirmed){
-            throw new MsgException("Can just handling Confirmed reservations");
+            throw new MsgException("Can only handle Confirmed reservations");
         }
         booking.setStatus(BookingStatus.Completed);
         bookingRepository.save(booking);
         return new BookingActionResult(bookingId, BookingStatus.Completed);
     }
+    // get detailed information for a specific booking.
     public SingleBookingVo getSingleBookingInfo(String bookingId){
         Booking booking = bookingRepository.getBookingById(bookingId);
         Slot slot = slotRepository.getSlotById(booking.getSlotId());
@@ -175,9 +185,13 @@ public class SpecialistBookingService {
         return user.getName();
     }
 
+    /**
+     Records a status change in the booking history and sends email notifications.
+     This method is triggered whenever a booking status is updated.
+     **/
     @Transactional
     public void createBookingHistory(Booking booking) throws Exception {
-        // 1. 检查这条记录是否已经存在
+        // check if the record has exists
         boolean exists = bookingHistoryRepository
                 .existsByBookingIdAndStatus(
                         booking.getId(),
@@ -196,34 +210,35 @@ public class SpecialistBookingService {
             return;
         }
 
-        // 2. 只创建一条历史记录
+        // create new history entry
         BookingHistory history = new BookingHistory();
         history.setBookingId(booking.getId());
         history.setStatus(booking.getStatus());
         history.setReason(booking.getNote());
         history.setChangedAt(booking.getUpdatedAt());
 
-        // 3. 只保存这一条
+        // only save one record
         bookingHistoryRepository.save(history);
 
 
-        //发送邮件逻辑
+        // Notification Logic: Dispatch emails via Aliyun service
         try {
             User customer = userRepository.findById(booking.getCustomerId());
             User specialist = userRepository.findById(booking.getSpecialistId());
             Slot slot = slotRepository.getSlotById(booking.getSlotId());
 
+            // change time range format
             String range = "";
             if (slot != null){
                 range = slot.getStartTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + " - " +
                         slot.getEndTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
             }
-            // 发送给Customer
+            // send to Customer
             if (customer != null && customer.getEmail()!= null){
                 aliyunMailService.sendGenericStatusNotification(customer.getEmail(), "Customer", booking.getStatus().name(),range, booking.getNote());
 
             }
-            // 发送给Specialist
+            // send to Specialist
             if (specialist != null && specialist.getEmail()!= null){
                 if (booking.getStatus() == BookingStatus.Cancelled){
                     aliyunMailService.sendCancellationNoticeToSpecialist(specialist.getEmail(), range);
