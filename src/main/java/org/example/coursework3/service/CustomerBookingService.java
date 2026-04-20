@@ -2,9 +2,13 @@ package org.example.coursework3.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.coursework3.dto.request.ConfirmBookingPaymentRequest;
+import org.example.coursework3.dto.request.CreateBookingPaymentRequest;
 import org.example.coursework3.dto.request.CreateBookingRequest;
 import org.example.coursework3.dto.response.BookingActionResult;
 import org.example.coursework3.dto.response.BookingPageResult;
+import org.example.coursework3.dto.response.ConfirmBookingPaymentResult;
+import org.example.coursework3.dto.response.CreateBookingPaymentResult;
 import org.example.coursework3.dto.response.CreateBookingResult;
 import org.example.coursework3.entity.*;
 import org.example.coursework3.exception.MsgException;
@@ -21,9 +25,14 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +42,28 @@ public class CustomerBookingService {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final AliyunMailService aliyunMailService;
+    private final AlipayGatewayService alipayGatewayService;
     private final BookingHistoryRepository bookingHistoryRepository;
+    private final Map<String, PaymentDraft> bookingPaymentDrafts = new ConcurrentHashMap<>();
+    private final Map<String, String> bookingIdByOutTradeNo = new ConcurrentHashMap<>();
+
+    private static class PaymentDraft {
+        private final String outTradeNo;
+        private final String paymentId;
+        private final Double amount;
+        private final String currency;
+        private final String customerId;
+        private volatile boolean paid;
+
+        private PaymentDraft(String outTradeNo, String paymentId, Double amount, String currency, String customerId) {
+            this.outTradeNo = outTradeNo;
+            this.paymentId = paymentId;
+            this.amount = amount;
+            this.currency = currency;
+            this.customerId = customerId;
+            this.paid = false;
+        }
+    }
 
     @Transactional
     public CreateBookingResult creatBooking(String userId, CreateBookingRequest request) {
@@ -51,6 +81,77 @@ public class CustomerBookingService {
         slotRepository.save(slot);
 
         return new CreateBookingResult(booking.getId(), booking.getSpecialistId(), booking.getSlotId(), booking.getStatus());
+    }
+
+    public CreateBookingPaymentResult createBookingPayment(String userId, String bookingId, CreateBookingPaymentRequest request) {
+        Booking booking = getOwnedBooking(userId, bookingId);
+        Slot slot = slotRepository.findById(booking.getSlotId())
+                .orElseThrow(() -> new MsgException("预约时段不存在"));
+
+        double amount = resolvePaymentAmount(request, slot);
+        String currency = resolveCurrency(request, slot);
+        String normalizedAmount = String.format(Locale.US, "%.2f", amount);
+        String outTradeNo = buildOutTradeNo(booking.getId());
+        String subject = "Booking " + booking.getId();
+        String alipayQrRawCode = alipayGatewayService.precreate(outTradeNo, normalizedAmount, subject);
+        String qrCodeUrl = "https://api.qrserver.com/v1/create-qr-code/?size=280x280&data="
+                + URLEncoder.encode(alipayQrRawCode, StandardCharsets.UTF_8);
+
+        String paymentId = outTradeNo;
+        bookingPaymentDrafts.put(booking.getId(), new PaymentDraft(outTradeNo, paymentId, amount, currency, userId));
+        bookingIdByOutTradeNo.put(outTradeNo, booking.getId());
+        return new CreateBookingPaymentResult(paymentId, outTradeNo, qrCodeUrl, amount, currency);
+    }
+
+    public ConfirmBookingPaymentResult confirmBookingPayment(String userId, String bookingId, ConfirmBookingPaymentRequest request) {
+        Booking booking = getOwnedBooking(userId, bookingId);
+        PaymentDraft draft = bookingPaymentDrafts.get(booking.getId());
+        if (draft == null) {
+            throw new MsgException("请先创建支付单");
+        }
+        if (!draft.customerId.equals(userId)) {
+            throw new MsgException("无权限操作该支付单");
+        }
+        String paymentId = safeTrim(request == null ? null : request.getPaymentId());
+        if (!paymentId.isBlank() && !draft.paymentId.equals(paymentId)) {
+            throw new MsgException("支付单不匹配");
+        }
+
+        if (draft.paid) {
+            return new ConfirmBookingPaymentResult(booking.getId(), draft.paymentId, "SUCCESS", booking.getStatus());
+        }
+
+        String tradeStatus = alipayGatewayService.queryTradeStatus(draft.outTradeNo);
+        if (!isAlipaySuccess(tradeStatus)) {
+            throw new MsgException("支付未完成，当前状态: " + safeTrim(tradeStatus));
+        }
+
+        draft.paid = true;
+        return new ConfirmBookingPaymentResult(booking.getId(), draft.paymentId, "SUCCESS", booking.getStatus());
+    }
+
+    public boolean handleAlipayNotify(Map<String, String> notifyParams) {
+        if (notifyParams == null || notifyParams.isEmpty()) {
+            return false;
+        }
+        boolean verified = alipayGatewayService.verifyNotify(notifyParams);
+        if (!verified) {
+            return false;
+        }
+        String outTradeNo = safeTrim(notifyParams.get("out_trade_no"));
+        String tradeStatus = safeTrim(notifyParams.get("trade_status"));
+        if (!isAlipaySuccess(tradeStatus)) {
+            return false;
+        }
+        String bookingId = bookingIdByOutTradeNo.get(outTradeNo);
+        if (bookingId == null) {
+            return false;
+        }
+        PaymentDraft draft = bookingPaymentDrafts.get(bookingId);
+        if (draft != null) {
+            draft.paid = true;
+        }
+        return true;
     }
 
     public BookingPageResult getMyBookings(String userId, String status, Integer page, Integer pageSize, String from, String to) {
@@ -134,6 +235,52 @@ public class CustomerBookingService {
         return user.getName();
     }
 
+    private Booking getOwnedBooking(String userId, String bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new MsgException("预约不存在"));
+        if (!userId.equals(booking.getCustomerId())) {
+            throw new MsgException("无权限操作该预约");
+        }
+        return booking;
+    }
+
+    private double resolvePaymentAmount(CreateBookingPaymentRequest request, Slot slot) {
+        double fallback = slot.getAmount() == null ? 0.0 : slot.getAmount().doubleValue();
+        if (request == null || request.getAmount() == null) {
+            return fallback;
+        }
+        return request.getAmount() < 0 ? fallback : request.getAmount();
+    }
+
+    private String resolveCurrency(CreateBookingPaymentRequest request, Slot slot) {
+        String fromSlot = safeTrim(slot.getCurrency());
+        if (!fromSlot.isBlank()) {
+            return fromSlot;
+        }
+        String fromRequest = safeTrim(request == null ? null : request.getCurrency());
+        if (!fromRequest.isBlank()) {
+            return fromRequest;
+        }
+        return "CNY";
+    }
+
+    private String safeTrim(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private boolean isAlipaySuccess(String status) {
+        return "TRADE_SUCCESS".equalsIgnoreCase(status) || "TRADE_FINISHED".equalsIgnoreCase(status);
+    }
+
+    private String buildOutTradeNo(String bookingId) {
+        long now = System.currentTimeMillis();
+        String compactId = bookingId == null ? "booking" : bookingId.replace("-", "");
+        if (compactId.length() > 20) {
+            compactId = compactId.substring(0, 20);
+        }
+        return "BK" + now + compactId;
+    }
+
     @Transactional
     public BookingActionResult cancelBooking(String id) {
         Booking booking = bookingRepository.getBookingById(id);
@@ -145,16 +292,6 @@ public class CustomerBookingService {
         Slot slot = slotRepository.getSlotById(booking.getSlotId());
         slot.setAvailable(true);
 
-//        try {
-//            User specialist = userRepository.findById(booking.getSpecialistId());
-//            if (specialist != null && specialist.getEmail() != null) {
-//                String timeRange = slot.getStartTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + " — " +
-//                        slot.getEndTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-//                aliyunMailService.sendCancellationNoticeToSpecialist(specialist.getEmail(), timeRange);
-//            }
-//        } catch (Exception e) {
-//            log.warn("发送专家取消通知失败: {}", e.getMessage());
-//        }
         return new BookingActionResult(id, BookingStatus.Cancelled);
     }
 

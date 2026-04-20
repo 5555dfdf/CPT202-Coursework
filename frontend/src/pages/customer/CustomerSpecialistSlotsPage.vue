@@ -24,6 +24,18 @@ const previewError = ref('')
 const weeklyPreview = ref([])
 const previewOpen = ref(false)
 const todayDate = new Date().toISOString().slice(0, 10)
+const paymentModalOpen = ref(false)
+const paymentBusy = ref(false)
+const paymentError = ref('')
+const paymentContext = ref({
+  bookingId: '',
+  paymentId: '',
+  amount: 0,
+  currency: 'CNY',
+  slotLabel: '--',
+  qrCodeUrl: '',
+  mockMode: false
+})
 
 function formatSlotTime(value) {
   const raw = String(value ?? '').trim()
@@ -55,6 +67,96 @@ function formatSession(slot) {
 
 function formatDetail(slot) {
   return String(slot?.detail ?? '').trim() || '--'
+}
+
+function resolveSelectedSlot() {
+  return slots.value.find((sl) => (sl.slotId ?? sl.id) === selectedSlotId.value) ?? null
+}
+
+async function openPaymentModal(bookingResult, selectedSlot) {
+  const bookingId = String(bookingResult?.id ?? '').trim()
+  if (!bookingId) {
+    throw new Error('Booking succeeded but missing booking id')
+  }
+
+  paymentBusy.value = true
+  paymentError.value = ''
+
+  const slotAmount = Number(selectedSlot?.amount ?? 0)
+  const safeSlotAmount = Number.isNaN(slotAmount) ? 0 : slotAmount
+  const slotCurrency = String(selectedSlot?.currency ?? 'CNY').trim() || 'CNY'
+  const slotLabel = formatSlotRange(selectedSlot)
+
+  try {
+    const payment = await api.createBookingPayment(bookingId, {
+      specialistId: props.id,
+      slotId: selectedSlot?.slotId ?? selectedSlot?.id,
+      amount: safeSlotAmount,
+      currency: slotCurrency,
+      scene: 'booking'
+    })
+
+    paymentContext.value = {
+      bookingId,
+      paymentId: String(payment?.paymentId ?? '').trim(),
+      amount: Number(payment?.amount ?? safeSlotAmount) || 0,
+      currency: String(payment?.currency ?? slotCurrency).trim() || 'CNY',
+      slotLabel,
+      qrCodeUrl: String(payment?.qrCodeUrl ?? '').trim(),
+      mockMode: false
+    }
+  } catch (e) {
+    paymentContext.value = {
+      bookingId,
+      paymentId: '',
+      amount: safeSlotAmount,
+      currency: slotCurrency,
+      slotLabel,
+      qrCodeUrl: '',
+      mockMode: false
+    }
+    paymentError.value = e?.message || 'Failed to create Alipay order'
+  } finally {
+    paymentBusy.value = false
+    paymentModalOpen.value = true
+  }
+}
+
+function closePaymentModal() {
+  paymentModalOpen.value = false
+  paymentError.value = ''
+}
+
+async function confirmPaymentAndGoBookings() {
+  if (!paymentContext.value.bookingId) {
+    paymentError.value = 'Missing booking id for payment confirmation'
+    return
+  }
+
+  paymentBusy.value = true
+  paymentError.value = ''
+  try {
+    await api.confirmBookingPayment(paymentContext.value.bookingId, {
+      paymentId: paymentContext.value.paymentId || undefined,
+      status: 'SUCCESS'
+    })
+  } catch (e) {
+    paymentError.value = e?.message || 'Failed to confirm payment'
+    paymentBusy.value = false
+    return
+  }
+
+  paymentModalOpen.value = false
+  showAlertModal({
+    type: 'success',
+    message: 'Payment successful.',
+    onClose: () =>
+      router.push({
+        name: 'customer.bookings',
+        query: { refresh: String(Date.now()) }
+      })
+  })
+  paymentBusy.value = false
 }
 
 function nextSevenDates() {
@@ -151,18 +253,17 @@ async function submitBooking() {
         onClose: () => router.push({ name: 'customer.bookingDetail', params: { id: props.bookingId } })
       })
     } else {
-      await api.createBooking({
+      const selectedSlot = resolveSelectedSlot()
+      const bookingResult = await api.createBooking({
         specialistId: props.id,
         slotId: selectedSlotId.value,
         note: note.value.trim() || undefined
       })
       note.value = ''
       selectedSlotId.value = ''
-      showAlertModal({
-        type: 'success',
-        message: 'Booking request submitted successfully.',
-        onClose: () => router.push({ name: 'customer.bookings' })
-      })
+      await loadSlots()
+      await openPaymentModal(bookingResult, selectedSlot)
+      return
     }
     await loadSlots()
   } catch (e) {
@@ -278,6 +379,39 @@ defineExpose({
         </button>
       </div>
     </template>
+
+    <div v-if="paymentModalOpen" class="payment-modal-backdrop" @click.self="closePaymentModal">
+      <section class="payment-modal-card" role="dialog" aria-modal="true" aria-label="Booking Payment">
+        <header class="payment-modal-head">
+          <h3 class="payment-modal-title">Complete Payment</h3>
+          <button type="button" class="payment-modal-close" :disabled="paymentBusy" @click="closePaymentModal">
+            ×
+          </button>
+        </header>
+
+        <div class="payment-modal-body">
+          <p class="payment-tip">Booking ID: {{ paymentContext.bookingId || '--' }}</p>
+          <p class="payment-tip">Slot: {{ paymentContext.slotLabel }}</p>
+          <p class="payment-amount">Amount: {{ paymentContext.amount.toFixed(2) }} {{ paymentContext.currency }}</p>
+
+          <div class="payment-qr-wrap">
+            <img v-if="paymentContext.qrCodeUrl" class="payment-qr" :src="paymentContext.qrCodeUrl" alt="Payment QR Code" />
+            <div v-else class="payment-qr-empty">QR code unavailable</div>
+          </div>
+
+          <p v-if="paymentError" class="banner banner--error payment-banner">{{ paymentError }}</p>
+        </div>
+
+        <footer class="payment-modal-foot">
+          <button type="button" class="btn-secondary" :disabled="paymentBusy" @click="closePaymentModal">
+            Pay Later
+          </button>
+          <button type="button" class="btn-submit" :disabled="paymentBusy" @click="confirmPaymentAndGoBookings">
+            {{ paymentBusy ? 'Confirming...' : 'Paid' }}
+          </button>
+        </footer>
+      </section>
+    </div>
   </section>
 </template>
 
@@ -541,9 +675,137 @@ defineExpose({
   cursor: not-allowed;
 }
 
+.btn-secondary {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 0;
+  border: 1px solid #202124;
+  background: #ffffff;
+  color: #202124;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.payment-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(17, 24, 39, 0.42);
+}
+
+.payment-modal-card {
+  width: min(100%, 460px);
+  background: #ffffff;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 0;
+  box-shadow: 0 16px 36px rgba(17, 24, 39, 0.16);
+}
+
+.payment-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #eceff3;
+}
+
+.payment-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.payment-modal-close {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d8d1cb;
+  border-radius: 0;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.payment-modal-body {
+  padding: 14px 16px;
+}
+
+.payment-tip {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.payment-amount {
+  margin: 8px 0 12px;
+  font-size: 15px;
+  color: #111827;
+  font-weight: 700;
+}
+
+.payment-qr-wrap {
+  width: 280px;
+  height: 280px;
+  margin: 0 auto;
+  border: 1px solid #d8d1cb;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+}
+
+.payment-qr {
+  width: 260px;
+  height: 260px;
+  object-fit: contain;
+}
+
+.payment-qr-empty {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.payment-banner {
+  margin-top: 12px;
+}
+
+.payment-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 16px;
+}
+
+.payment-modal-foot .btn-submit {
+  margin-top: 0;
+}
+
 @media (max-width: 720px) {
   .preview-row {
     grid-template-columns: 1fr;
+  }
+
+  .payment-qr-wrap {
+    width: 240px;
+    height: 240px;
+  }
+
+  .payment-qr {
+    width: 220px;
+    height: 220px;
   }
 }
 </style>

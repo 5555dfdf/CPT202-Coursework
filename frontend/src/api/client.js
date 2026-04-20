@@ -38,9 +38,7 @@ function throwIfHtmlString(body) {
   }
 }
 
-/**
- * 兼容：直接数组、Spring Result(data)、若依 rows、分页 list/records 等。
- */
+
 export function extractListPayload(body) {
   if (body == null) return []
   throwIfHtmlString(body)
@@ -62,7 +60,7 @@ export function extractListPayload(body) {
   return []
 }
 
-/** 单体 / Result.data 对象（非数组） */
+
 export function extractDataPayload(body) {
   if (body == null) return null
   throwIfHtmlString(body)
@@ -75,7 +73,7 @@ export function extractDataPayload(body) {
   return body
 }
 
-/** 鍏煎锛氬崟涓璞℃垨鏁扮粍锛屼紭鍏堣繑鍥?Result.data */
+
 export function extractDataOrListPayload(body) {
   if (body == null) return null
   throwIfHtmlString(body)
@@ -89,7 +87,18 @@ export function extractDataOrListPayload(body) {
   return body
 }
 
-/** 分页：items + total + page + pageSize，兼容 Result 包裹 */
+function extractPaymentPayload(body) {
+  const d = extractDataPayload(body) ?? body
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return {}
+  return {
+    ...d,
+    paymentId: d.paymentId ?? d.id ?? '',
+    paymentToken: d.paymentToken ?? d.token ?? d.paymentId ?? d.id ?? '',
+    qrCodeUrl: d.qrCodeUrl ?? d.qrUrl ?? d.paymentQrCodeUrl ?? d.codeUrl ?? ''
+  }
+}
+
+
 export function extractPagePayload(body) {
   const empty = { items: [], total: 0, page: 1, pageSize: 10 }
   if (body == null) return empty
@@ -245,6 +254,44 @@ export const api = {
       request(http.patch(`/admin/pricing-rules/${id}`, payload)).then(extractDataPayload),
   adminDeletePricingRule: (id) =>
       request(http.delete(`/admin/pricing-rules/${id}`)).then(extractDataPayload),
+
+  createBookingPayment: async (bookingId, payload) => {
+    const candidates = [
+      `/bookings/${bookingId}/payment`,
+      `/bookings/${bookingId}/pay`,
+      `/payments/bookings/${bookingId}`
+    ]
+    let lastErr = null
+    for (const url of candidates) {
+      try {
+        return await request(http.post(url, payload)).then(extractPaymentPayload)
+      } catch (e) {
+        lastErr = e
+        if (e?.status === 403 || e?.status === 404 || e?.status === 405) continue
+        throw e
+      }
+    }
+    throw lastErr ?? new Error('Failed to create payment')
+  },
+  confirmBookingPayment: async (bookingId, payload) => {
+    const candidates = [
+      `/bookings/${bookingId}/payment/confirm`,
+      `/bookings/${bookingId}/pay/confirm`,
+      `/bookings/${bookingId}/pay/success`,
+      `/payments/bookings/${bookingId}/confirm`
+    ]
+    let lastErr = null
+    for (const url of candidates) {
+      try {
+        return await request(http.post(url, payload)).then(extractDataPayload)
+      } catch (e) {
+        lastErr = e
+        if (e?.status === 403 || e?.status === 404 || e?.status === 405) continue
+        throw e
+      }
+    }
+    throw lastErr ?? new Error('Failed to confirm payment')
+  },
 
   // Specialist slot management
   specialistListSlots: (params) => request(http.get('/specialist/slots', { params })).then(extractListPayload),

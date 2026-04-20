@@ -2,9 +2,13 @@ package org.example.coursework3.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.example.coursework3.dto.request.CreateBookingRequest;
+import org.example.coursework3.dto.request.CreateBookingPaymentRequest;
+import org.example.coursework3.dto.request.ConfirmBookingPaymentRequest;
 import org.example.coursework3.dto.request.RescheduleBookingRequest;
 import org.example.coursework3.dto.response.BookingActionResult;
 import org.example.coursework3.dto.response.BookingPageResult;
+import org.example.coursework3.dto.response.ConfirmBookingPaymentResult;
+import org.example.coursework3.dto.response.CreateBookingPaymentResult;
 import org.example.coursework3.dto.response.CreateBookingResult;
 import org.example.coursework3.dto.response.RescheduleBookingResult;
 import org.example.coursework3.entity.BookingStatus;
@@ -14,6 +18,7 @@ import org.example.coursework3.service.CustomerBookingService;
 import org.example.coursework3.vo.SingleBookingVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/bookings")
@@ -72,5 +77,33 @@ public class BookingController {
         }
         bookingService.rescheduleBooking(id, request.getSlotId());
         return Result.success(new RescheduleBookingResult(id, BookingStatus.Pending, request.getSlotId()));
+    }
+
+    @PostMapping("/{id}/payment")
+    public Result<CreateBookingPaymentResult> createBookingPayment(@RequestHeader("Authorization") String authHeader,
+                                                                   @PathVariable String id,
+                                                                   @RequestBody(required = false) CreateBookingPaymentRequest request) {
+        if (!authService.verifyAsCustomer(authHeader)) {
+            return Result.error("ERROR", "请以顾客身份支付");
+        }
+        String userId = authService.getUserIdByAuth(authHeader);
+        return Result.success(bookingService.createBookingPayment(userId, id, request));
+    }
+
+    @PostMapping("/{id}/payment/confirm")
+    public Result<ConfirmBookingPaymentResult> confirmBookingPayment(@RequestHeader("Authorization") String authHeader,
+                                                                     @PathVariable String id,
+                                                                     @RequestBody(required = false) ConfirmBookingPaymentRequest request) {
+        if (!authService.verifyAsCustomer(authHeader)) {
+            return Result.error("ERROR", "请以顾客身份支付");
+        }
+        String userId = authService.getUserIdByAuth(authHeader);
+        return Result.success(bookingService.confirmBookingPayment(userId, id, request));
+    }
+
+    @PostMapping("/alipay/notify")
+    public String alipayNotify(@RequestParam Map<String, String> params) {
+        boolean ok = bookingService.handleAlipayNotify(params);
+        return ok ? "success" : "failure";
     }
 }

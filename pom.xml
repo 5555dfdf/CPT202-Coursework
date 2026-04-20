@@ -79,6 +79,12 @@
             <scope>provided</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>26.1.0</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -102,6 +108,13 @@
             <groupId>com.aliyun</groupId>
             <artifactId>dm20151123</artifactId>
             <version>1.9.3</version>
+        </dependency>
+
+        <!-- Alipay -->
+        <dependency>
+            <groupId>com.alipay.sdk</groupId>
+            <artifactId>alipay-sdk-java</artifactId>
+            <version>4.40.476.ALL</version>
         </dependency>
     </dependencies>
 

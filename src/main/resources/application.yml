@@ -26,3 +26,4 @@ aliyun:
     access-key-secret: ${ALICLOUD_ACCESS_KEY_SECRET}
     region: cn-hangzhou
     from-address: service@mail.fulingyi.xyz
+
