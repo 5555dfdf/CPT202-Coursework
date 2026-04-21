@@ -292,6 +292,32 @@ export const api = {
     }
     throw lastErr ?? new Error('Failed to confirm payment')
   },
+  mockBookingPayment: async (bookingId) => {
+    const candidates = [
+      `/bookings/${bookingId}/payment/mock-success`,
+      `/bookings/${bookingId}/pay/mock-success`
+    ]
+    let lastErr = null
+    for (const url of candidates) {
+      try {
+        return await request(http.post(url)).then(extractDataPayload)
+      } catch (e) {
+        lastErr = e
+        if (e?.status === 403 || e?.status === 404 || e?.status === 405) continue
+        throw e
+      }
+    }
+    throw lastErr ?? new Error('Failed to mock payment')
+  },
+  listUnpaidPayments: () =>
+      request(http.get('/bookings/unpaid-payments')).then((body) => {
+        const data = extractDataPayload(body) ?? {}
+        return Array.isArray(data.items) ? data.items : []
+      }),
+  getUnpaidPayment: (paymentIntentId) =>
+      request(http.get(`/bookings/unpaid-payments/${paymentIntentId}`)).then(extractDataPayload),
+  resumeUnpaidPayment: (paymentIntentId) =>
+      request(http.post(`/bookings/unpaid-payments/${paymentIntentId}/resume`)).then(extractPaymentPayload),
 
   // Specialist slot management
   specialistListSlots: (params) => request(http.get('/specialist/slots', { params })).then(extractListPayload),

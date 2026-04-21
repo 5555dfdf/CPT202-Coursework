@@ -28,8 +28,11 @@ const paymentModalOpen = ref(false)
 const paymentBusy = ref(false)
 const paymentError = ref('')
 const paymentContext = ref({
-  bookingId: '',
+  paymentIntentId: '',
   paymentId: '',
+  specialistId: '',
+  slotId: '',
+  note: '',
   amount: 0,
   currency: 'CNY',
   slotLabel: '--',
@@ -73,14 +76,16 @@ function resolveSelectedSlot() {
   return slots.value.find((sl) => (sl.slotId ?? sl.id) === selectedSlotId.value) ?? null
 }
 
-async function openPaymentModal(bookingResult, selectedSlot) {
-  const bookingId = String(bookingResult?.id ?? '').trim()
-  if (!bookingId) {
-    throw new Error('Booking succeeded but missing booking id')
+async function openPaymentModal(paymentIntentId, selectedSlot, draftNote) {
+  const safePaymentIntentId = String(paymentIntentId ?? '').trim()
+  if (!safePaymentIntentId) {
+    throw new Error('Missing payment intent id')
   }
 
   paymentBusy.value = true
   paymentError.value = ''
+  const specialistId = String(props.id ?? '').trim()
+  const slotId = String(selectedSlot?.slotId ?? selectedSlot?.id ?? '').trim()
 
   const slotAmount = Number(selectedSlot?.amount ?? 0)
   const safeSlotAmount = Number.isNaN(slotAmount) ? 0 : slotAmount
@@ -88,17 +93,20 @@ async function openPaymentModal(bookingResult, selectedSlot) {
   const slotLabel = formatSlotRange(selectedSlot)
 
   try {
-    const payment = await api.createBookingPayment(bookingId, {
-      specialistId: props.id,
-      slotId: selectedSlot?.slotId ?? selectedSlot?.id,
+    const payment = await api.createBookingPayment(safePaymentIntentId, {
+      specialistId,
+      slotId,
       amount: safeSlotAmount,
       currency: slotCurrency,
       scene: 'booking'
     })
 
     paymentContext.value = {
-      bookingId,
+      paymentIntentId: safePaymentIntentId,
       paymentId: String(payment?.paymentId ?? '').trim(),
+      specialistId,
+      slotId,
+      note: String(draftNote ?? '').trim(),
       amount: Number(payment?.amount ?? safeSlotAmount) || 0,
       currency: String(payment?.currency ?? slotCurrency).trim() || 'CNY',
       slotLabel,
@@ -107,8 +115,11 @@ async function openPaymentModal(bookingResult, selectedSlot) {
     }
   } catch (e) {
     paymentContext.value = {
-      bookingId,
+      paymentIntentId: safePaymentIntentId,
       paymentId: '',
+      specialistId,
+      slotId,
+      note: String(draftNote ?? '').trim(),
       amount: safeSlotAmount,
       currency: slotCurrency,
       slotLabel,
@@ -128,17 +139,23 @@ function closePaymentModal() {
 }
 
 async function confirmPaymentAndGoBookings() {
-  if (!paymentContext.value.bookingId) {
-    paymentError.value = 'Missing booking id for payment confirmation'
+  if (!paymentContext.value.paymentIntentId) {
+    paymentError.value = 'Missing payment intent id for payment confirmation'
     return
   }
 
   paymentBusy.value = true
   paymentError.value = ''
   try {
-    await api.confirmBookingPayment(paymentContext.value.bookingId, {
+    await api.confirmBookingPayment(paymentContext.value.paymentIntentId, {
       paymentId: paymentContext.value.paymentId || undefined,
       status: 'SUCCESS'
+    })
+    await api.createBooking({
+      specialistId: paymentContext.value.specialistId,
+      slotId: paymentContext.value.slotId,
+      paymentId: paymentContext.value.paymentId,
+      note: paymentContext.value.note || undefined
     })
   } catch (e) {
     paymentError.value = e?.message || 'Failed to confirm payment'
@@ -150,6 +167,41 @@ async function confirmPaymentAndGoBookings() {
   showAlertModal({
     type: 'success',
     message: 'Payment successful.',
+    onClose: () =>
+      router.push({
+        name: 'customer.bookings',
+        query: { refresh: String(Date.now()) }
+      })
+  })
+  paymentBusy.value = false
+}
+
+async function mockPaymentAndGoBookings() {
+  if (!paymentContext.value.paymentIntentId) {
+    paymentError.value = 'Missing payment intent id for mock payment'
+    return
+  }
+
+  paymentBusy.value = true
+  paymentError.value = ''
+  try {
+    await api.mockBookingPayment(paymentContext.value.paymentIntentId)
+    await api.createBooking({
+      specialistId: paymentContext.value.specialistId,
+      slotId: paymentContext.value.slotId,
+      paymentId: paymentContext.value.paymentId,
+      note: paymentContext.value.note || undefined
+    })
+  } catch (e) {
+    paymentError.value = e?.message || 'Failed to mock payment'
+    paymentBusy.value = false
+    return
+  }
+
+  paymentModalOpen.value = false
+  showAlertModal({
+    type: 'success',
+    message: 'Mock payment successful.',
     onClose: () =>
       router.push({
         name: 'customer.bookings',
@@ -254,15 +306,11 @@ async function submitBooking() {
       })
     } else {
       const selectedSlot = resolveSelectedSlot()
-      const bookingResult = await api.createBooking({
-        specialistId: props.id,
-        slotId: selectedSlotId.value,
-        note: note.value.trim() || undefined
-      })
-      note.value = ''
+      const draftNote = note.value.trim()
+      const paymentIntentId = (globalThis.crypto?.randomUUID?.() ?? `pi_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`)
       selectedSlotId.value = ''
       await loadSlots()
-      await openPaymentModal(bookingResult, selectedSlot)
+      await openPaymentModal(paymentIntentId, selectedSlot, draftNote)
       return
     }
     await loadSlots()
@@ -390,7 +438,7 @@ defineExpose({
         </header>
 
         <div class="payment-modal-body">
-          <p class="payment-tip">Booking ID: {{ paymentContext.bookingId || '--' }}</p>
+          <p class="payment-tip">Payment Intent ID: {{ paymentContext.paymentIntentId || '--' }}</p>
           <p class="payment-tip">Slot: {{ paymentContext.slotLabel }}</p>
           <p class="payment-amount">Amount: {{ paymentContext.amount.toFixed(2) }} {{ paymentContext.currency }}</p>
 
@@ -403,6 +451,9 @@ defineExpose({
         </div>
 
         <footer class="payment-modal-foot">
+          <button type="button" class="btn-secondary" :disabled="paymentBusy" @click="mockPaymentAndGoBookings">
+            Mock Payment
+          </button>
           <button type="button" class="btn-secondary" :disabled="paymentBusy" @click="closePaymentModal">
             Pay Later
           </button>

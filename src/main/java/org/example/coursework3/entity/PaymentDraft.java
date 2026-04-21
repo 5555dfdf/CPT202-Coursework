@@ -11,14 +11,19 @@ public class PaymentDraft {
     private Double amount;
     private String currency;
     private String customerId;
+    private String specialistId;
+    private String slotId;
     private boolean paid;
 
-    public PaymentDraft(String outTradeNo, String paymentId, Double amount, String currency, String customerId) {
+    public PaymentDraft(String outTradeNo, String paymentId, Double amount, String currency, String customerId,
+                        String specialistId, String slotId) {
         this.outTradeNo = outTradeNo;
         this.paymentId = paymentId;
         this.amount = amount;
         this.currency = currency;
         this.customerId = customerId;
+        this.specialistId = specialistId;
+        this.slotId = slotId;
         this.paid = false;
     }
 }

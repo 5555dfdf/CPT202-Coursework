@@ -10,6 +10,8 @@ import org.example.coursework3.dto.response.BookingPageResult;
 import org.example.coursework3.dto.response.ConfirmBookingPaymentResult;
 import org.example.coursework3.dto.response.CreateBookingPaymentResult;
 import org.example.coursework3.dto.response.CreateBookingResult;
+import org.example.coursework3.dto.response.UnpaidPaymentItemResult;
+import org.example.coursework3.dto.response.UnpaidPaymentsResult;
 import org.example.coursework3.entity.*;
 import org.example.coursework3.exception.MsgException;
 import org.example.coursework3.repository.BookingHistoryRepository;
@@ -19,12 +21,15 @@ import org.example.coursework3.repository.UserRepository;
 import org.example.coursework3.vo.MyBookingVo;
 import org.example.coursework3.vo.SingleBookingVo;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.net.URLEncoder;
@@ -34,6 +39,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 
 @Service
@@ -48,13 +54,41 @@ public class CustomerBookingService {
     private final BookingHistoryRepository bookingHistoryRepository;
     private static final String PAYMENT_DRAFT_KEY = "booking:payment:draft:";
     private static final String OUT_TRADE_KEY = "booking:payment:outTrade:";
+    private static final String USER_UNPAID_KEY = "booking:payment:user:";
+    private static final Duration PAYMENT_TTL = Duration.ofMinutes(15);
+    private static final ZoneId APP_ZONE = ZoneId.of("Asia/Shanghai");
     private final RedisTemplate<String, Object> redisTemplate;
+    @Value("${payment.mock-enabled:false}")
+    private boolean mockPaymentEnabled;
 //    private final Map<String, PaymentDraft> bookingPaymentDrafts = new ConcurrentHashMap<>();
 //    private final Map<String, String> bookingIdByOutTradeNo = new ConcurrentHashMap<>();
 
 
     @Transactional
     public CreateBookingResult creatBooking(String userId, CreateBookingRequest request) {
+        String paymentId = safeTrim(request.getPaymentId());
+        if (paymentId.isBlank()) {
+            throw new MsgException("请先完成支付");
+        }
+        String paymentIntentId = (String) redisTemplate.opsForValue().get(OUT_TRADE_KEY + paymentId);
+        if (paymentIntentId == null) {
+            throw new MsgException("支付单无效或已过期，请重新支付");
+        }
+        PaymentDraft draft = (PaymentDraft) redisTemplate.opsForValue().get(PAYMENT_DRAFT_KEY + paymentIntentId);
+        if (draft == null) {
+            throw new MsgException("支付信息无效或已过期，请重新支付");
+        }
+        if (!userId.equals(draft.getCustomerId())) {
+            throw new MsgException("无权限创建该预约");
+        }
+        if (!draft.isPaid()) {
+            throw new MsgException("支付尚未完成，请完成支付后再提交预约");
+        }
+        if (!safeTrim(request.getSpecialistId()).equals(safeTrim(draft.getSpecialistId()))
+                || !safeTrim(request.getSlotId()).equals(safeTrim(draft.getSlotId()))) {
+            throw new MsgException("支付信息与预约信息不一致，请重新支付");
+        }
+
         Slot slot = slotRepository.getById(request.getSlotId());
         if (!slot.getAvailable()){
             throw new MsgException("请选择有效时段");
@@ -67,44 +101,62 @@ public class CustomerBookingService {
         bookingRepository.save(booking);
         slot.setAvailable(false);
         slotRepository.save(slot);
+        redisTemplate.delete(PAYMENT_DRAFT_KEY + paymentIntentId);
+        redisTemplate.delete(OUT_TRADE_KEY + paymentId);
+        redisTemplate.opsForZSet().remove(userUnpaidKey(userId), paymentIntentId);
 
         return new CreateBookingResult(booking.getId(), booking.getSpecialistId(), booking.getSlotId(), booking.getStatus());
     }
 
-    public CreateBookingPaymentResult createBookingPayment(String userId, String bookingId, CreateBookingPaymentRequest request) {
-        Booking booking = getOwnedBooking(userId, bookingId);
-        Slot slot = slotRepository.findById(booking.getSlotId())
+    public CreateBookingPaymentResult createBookingPayment(String userId, String paymentIntentId, CreateBookingPaymentRequest request) {
+        String specialistId = safeTrim(request == null ? null : request.getSpecialistId());
+        String slotId = safeTrim(request == null ? null : request.getSlotId());
+        if (specialistId.isBlank() || slotId.isBlank()) {
+            throw new MsgException("specialistId和slotId不能为空");
+        }
+        Slot slot = slotRepository.findById(slotId)
                 .orElseThrow(() -> new MsgException("预约时段不存在"));
+        if (!specialistId.equals(slot.getSpecialistId())) {
+            throw new MsgException("专家与时段不匹配");
+        }
+        if (!Boolean.TRUE.equals(slot.getAvailable())) {
+            throw new MsgException("该时段已被占用，请选择其他时段");
+        }
+        String normalizedIntentId = safeTrim(paymentIntentId);
+        if (normalizedIntentId.isBlank()) {
+            throw new MsgException("payment intent id不能为空");
+        }
 
         double amount = resolvePaymentAmount(request, slot);
         String currency = resolveCurrency(request, slot);
         String normalizedAmount = String.format(Locale.US, "%.2f", amount);
-        String paymentToken = buildPaymentToken(booking.getId());
-        String subject = "Booking " + booking.getId();
+        String paymentToken = buildPaymentToken(normalizedIntentId);
+        String subject = "Booking " + normalizedIntentId;
         String alipayQrRawCode = alipayGatewayService.precreate(paymentToken, normalizedAmount, subject);
         String qrCodeUrl = "https://api.qrserver.com/v1/create-qr-code/?size=280x280&data="
                 + URLEncoder.encode(alipayQrRawCode, StandardCharsets.UTF_8);
 
 //        bookingPaymentDrafts.put(booking.getId(), new PaymentDraft(paymentToken, paymentToken, amount, currency, userId));
         redisTemplate.opsForValue().set(
-                PAYMENT_DRAFT_KEY + booking.getId(),
-                new PaymentDraft(paymentToken, paymentToken, amount, currency, userId),
-                Duration.ofMinutes(15));
+                PAYMENT_DRAFT_KEY + normalizedIntentId,
+                new PaymentDraft(paymentToken, paymentToken, amount, currency, userId, specialistId, slotId),
+                PAYMENT_TTL);
 //        bookingIdByOutTradeNo.put(paymentToken, booking.getId());
         redisTemplate.opsForValue().set(
                 OUT_TRADE_KEY + paymentToken,
-                booking.getId(),
-                Duration.ofMinutes(15)
+                normalizedIntentId,
+                PAYMENT_TTL
         );
+        long expiresAtMs = Instant.now().plus(PAYMENT_TTL).toEpochMilli();
+        redisTemplate.opsForZSet().add(userUnpaidKey(userId), normalizedIntentId, expiresAtMs);
         log.info("create outTradeNo: {}", paymentToken);
         return new CreateBookingPaymentResult(paymentToken, paymentToken, qrCodeUrl, amount, currency);
     }
 
-    public ConfirmBookingPaymentResult confirmBookingPayment(String userId, String bookingId, ConfirmBookingPaymentRequest request) {
-        Booking booking = getOwnedBooking(userId, bookingId);
+    public ConfirmBookingPaymentResult confirmBookingPayment(String userId, String paymentIntentId, ConfirmBookingPaymentRequest request) {
 //        PaymentDraft draft = bookingPaymentDrafts.get(booking.getId());
         PaymentDraft draft = (PaymentDraft) redisTemplate.opsForValue()
-                .get(PAYMENT_DRAFT_KEY + booking.getId());
+                .get(PAYMENT_DRAFT_KEY + paymentIntentId);
         if (draft == null) {
             throw new MsgException("请先创建支付单");
         }
@@ -117,7 +169,7 @@ public class CustomerBookingService {
         }
 
         if (draft.isPaid()) {
-            return new ConfirmBookingPaymentResult(booking.getId(), draft.getPaymentId(), "SUCCESS", booking.getStatus());
+            return new ConfirmBookingPaymentResult(paymentIntentId, draft.getPaymentId(), "SUCCESS", BookingStatus.Pending);
         }
 
         log.info("query outTradeNo: {}", draft.getOutTradeNo());
@@ -129,11 +181,35 @@ public class CustomerBookingService {
 
         draft.setPaid(true);
         redisTemplate.opsForValue().set(
-                PAYMENT_DRAFT_KEY + booking.getId(),
+                PAYMENT_DRAFT_KEY + paymentIntentId,
                 draft,
-                Duration.ofMinutes(15)
+                PAYMENT_TTL
         );
-        return new ConfirmBookingPaymentResult(booking.getId(), draft.getPaymentId(), "SUCCESS", booking.getStatus());
+        redisTemplate.opsForZSet().remove(userUnpaidKey(userId), paymentIntentId);
+        return new ConfirmBookingPaymentResult(paymentIntentId, draft.getPaymentId(), "SUCCESS", BookingStatus.Pending);
+    }
+
+    public ConfirmBookingPaymentResult mockSuccessPayment(String userId, String paymentIntentId) {
+        if (!mockPaymentEnabled) {
+            throw new MsgException("Mock支付未开启");
+        }
+        String normalizedIntentId = safeTrim(paymentIntentId);
+        if (normalizedIntentId.isBlank()) {
+            throw new MsgException("payment intent id不能为空");
+        }
+        PaymentDraft draft = (PaymentDraft) redisTemplate.opsForValue().get(PAYMENT_DRAFT_KEY + normalizedIntentId);
+        if (draft == null) {
+            throw new MsgException("请先创建支付单");
+        }
+        if (!userId.equals(draft.getCustomerId())) {
+            throw new MsgException("无权限操作该支付单");
+        }
+        if (!draft.isPaid()) {
+            draft.setPaid(true);
+            redisTemplate.opsForValue().set(PAYMENT_DRAFT_KEY + normalizedIntentId, draft, PAYMENT_TTL);
+            redisTemplate.opsForZSet().remove(userUnpaidKey(userId), normalizedIntentId);
+        }
+        return new ConfirmBookingPaymentResult(normalizedIntentId, draft.getPaymentId(), "SUCCESS", BookingStatus.Pending);
     }
 
     public boolean handleAlipayNotify(Map<String, String> notifyParams) {
@@ -149,23 +225,97 @@ public class CustomerBookingService {
         if (!isAlipaySuccess(tradeStatus)) {
             return false;
         }
-//        String bookingId = bookingIdByOutTradeNo.get(outTradeNo);
-        String bookingId = (String) redisTemplate.opsForValue()
+//        String paymentIntentId = bookingIdByOutTradeNo.get(outTradeNo);
+        String paymentIntentId = (String) redisTemplate.opsForValue()
                 .get(OUT_TRADE_KEY + outTradeNo);
-        if (bookingId == null) {
+        if (paymentIntentId == null) {
             return false;
         }
         PaymentDraft draft = (PaymentDraft) redisTemplate.opsForValue()
-                .get(PAYMENT_DRAFT_KEY + bookingId);
+                .get(PAYMENT_DRAFT_KEY + paymentIntentId);
         if (draft != null) {
             draft.setPaid(true);
             redisTemplate.opsForValue().set(
-                    PAYMENT_DRAFT_KEY + bookingId,
+                    PAYMENT_DRAFT_KEY + paymentIntentId,
                     draft,
-                    Duration.ofMinutes(15)
+                    PAYMENT_TTL
             );
+            redisTemplate.opsForZSet().remove(userUnpaidKey(draft.getCustomerId()), paymentIntentId);
         }
         return true;
+    }
+
+    public UnpaidPaymentsResult listUnpaidPayments(String userId) {
+        Set<Object> intentSet = redisTemplate.opsForZSet().range(userUnpaidKey(userId), 0, -1);
+        List<UnpaidPaymentItemResult> items = new ArrayList<>();
+        if (intentSet == null || intentSet.isEmpty()) {
+            return new UnpaidPaymentsResult(items);
+        }
+        long nowMs = Instant.now().toEpochMilli();
+        for (Object raw : intentSet) {
+            String intentId = safeTrim(raw == null ? null : String.valueOf(raw));
+            if (intentId.isBlank()) continue;
+            UnpaidPaymentItemResult item = loadUnpaidItem(userId, intentId, nowMs, true);
+            if (item != null) {
+                items.add(item);
+            }
+        }
+        items.sort((a, b) -> Long.compare(b.getRemainingSeconds() == null ? 0 : b.getRemainingSeconds(),
+                a.getRemainingSeconds() == null ? 0 : a.getRemainingSeconds()));
+        return new UnpaidPaymentsResult(items);
+    }
+
+    public UnpaidPaymentItemResult getUnpaidPayment(String userId, String paymentIntentId) {
+        return loadUnpaidItem(userId, paymentIntentId, Instant.now().toEpochMilli(), false);
+    }
+
+    public CreateBookingPaymentResult resumeUnpaidPayment(String userId, String paymentIntentId) {
+        String normalizedIntentId = safeTrim(paymentIntentId);
+        if (normalizedIntentId.isBlank()) {
+            throw new MsgException("payment intent id不能为空");
+        }
+        PaymentDraft draft = (PaymentDraft) redisTemplate.opsForValue().get(PAYMENT_DRAFT_KEY + normalizedIntentId);
+        if (draft == null) {
+            redisTemplate.opsForZSet().remove(userUnpaidKey(userId), normalizedIntentId);
+            throw new MsgException("未支付订单不存在或已过期");
+        }
+        if (!userId.equals(draft.getCustomerId())) {
+            throw new MsgException("无权限操作该支付单");
+        }
+        if (draft.isPaid()) {
+            redisTemplate.opsForZSet().remove(userUnpaidKey(userId), normalizedIntentId);
+            throw new MsgException("该支付单已完成支付");
+        }
+        Slot slot = slotRepository.findById(draft.getSlotId())
+                .orElseThrow(() -> new MsgException("预约时段不存在"));
+        if (!Boolean.TRUE.equals(slot.getAvailable())) {
+            cleanupIntent(draft.getCustomerId(), normalizedIntentId, draft.getPaymentId());
+            throw new MsgException("该时段已被占用，请重新选择");
+        }
+        if (!safeTrim(slot.getSpecialistId()).equals(safeTrim(draft.getSpecialistId()))) {
+            cleanupIntent(draft.getCustomerId(), normalizedIntentId, draft.getPaymentId());
+            throw new MsgException("专家与时段不匹配");
+        }
+
+        String newPaymentToken = buildPaymentToken(normalizedIntentId);
+        String normalizedAmount = String.format(Locale.US, "%.2f", draft.getAmount() == null ? 0 : draft.getAmount());
+        String subject = "Booking " + normalizedIntentId;
+        String alipayQrRawCode = alipayGatewayService.precreate(newPaymentToken, normalizedAmount, subject);
+        String qrCodeUrl = "https://api.qrserver.com/v1/create-qr-code/?size=280x280&data="
+                + URLEncoder.encode(alipayQrRawCode, StandardCharsets.UTF_8);
+
+        String oldPaymentId = safeTrim(draft.getPaymentId());
+        if (!oldPaymentId.isBlank()) {
+            redisTemplate.delete(OUT_TRADE_KEY + oldPaymentId);
+        }
+        draft.setOutTradeNo(newPaymentToken);
+        draft.setPaymentId(newPaymentToken);
+        draft.setPaid(false);
+        redisTemplate.opsForValue().set(PAYMENT_DRAFT_KEY + normalizedIntentId, draft, PAYMENT_TTL);
+        redisTemplate.opsForValue().set(OUT_TRADE_KEY + newPaymentToken, normalizedIntentId, PAYMENT_TTL);
+        long expiresAtMs = Instant.now().plus(PAYMENT_TTL).toEpochMilli();
+        redisTemplate.opsForZSet().add(userUnpaidKey(userId), normalizedIntentId, expiresAtMs);
+        return new CreateBookingPaymentResult(newPaymentToken, newPaymentToken, qrCodeUrl, draft.getAmount(), draft.getCurrency());
     }
 
     public BookingPageResult getMyBookings(String userId, String status, Integer page, Integer pageSize, String from, String to) {
@@ -280,6 +430,62 @@ public class CustomerBookingService {
 
     private String safeTrim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String userUnpaidKey(String userId) {
+        return USER_UNPAID_KEY + userId;
+    }
+
+    private void cleanupIntent(String userId, String intentId, String paymentId) {
+        redisTemplate.delete(PAYMENT_DRAFT_KEY + intentId);
+        if (!safeTrim(paymentId).isBlank()) {
+            redisTemplate.delete(OUT_TRADE_KEY + paymentId);
+        }
+        redisTemplate.opsForZSet().remove(userUnpaidKey(userId), intentId);
+    }
+
+    private UnpaidPaymentItemResult loadUnpaidItem(String userId, String paymentIntentId, long nowMs, boolean silent) {
+        String intentId = safeTrim(paymentIntentId);
+        if (intentId.isBlank()) return null;
+        PaymentDraft draft = (PaymentDraft) redisTemplate.opsForValue().get(PAYMENT_DRAFT_KEY + intentId);
+        if (draft == null) {
+            redisTemplate.opsForZSet().remove(userUnpaidKey(userId), intentId);
+            return null;
+        }
+        if (!userId.equals(draft.getCustomerId())) {
+            if (silent) return null;
+            throw new MsgException("无权限查看该支付单");
+        }
+        if (draft.isPaid()) {
+            redisTemplate.opsForZSet().remove(userUnpaidKey(userId), intentId);
+            return null;
+        }
+        Double score = redisTemplate.opsForZSet().score(userUnpaidKey(userId), intentId);
+        long expiresAtMs = score == null ? nowMs : score.longValue();
+        long remainSec = Math.max(0, (expiresAtMs - nowMs) / 1000);
+        if (remainSec <= 0) {
+            cleanupIntent(userId, intentId, draft.getPaymentId());
+            return null;
+        }
+        Slot slot = slotRepository.findById(draft.getSlotId()).orElse(null);
+        String slotLabel = draft.getSlotId();
+        if (slot != null) {
+            slotLabel = slot.getStartTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + " - "
+                    + slot.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm"));
+        }
+        String expiresAt = Instant.ofEpochMilli(expiresAtMs).atZone(APP_ZONE).toOffsetDateTime().toString();
+        return new UnpaidPaymentItemResult(
+                intentId,
+                draft.getPaymentId(),
+                draft.getSpecialistId(),
+                draft.getSlotId(),
+                slotLabel,
+                draft.getAmount(),
+                draft.getCurrency(),
+                "UNPAID",
+                expiresAt,
+                remainSec
+        );
     }
 
     private boolean isAlipaySuccess(String status) {

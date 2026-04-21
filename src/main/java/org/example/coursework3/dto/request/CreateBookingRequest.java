@@ -9,5 +9,7 @@ public class CreateBookingRequest {
     private String specialistId;
     @NotBlank(message = "时段ID不能为空")
     private String slotId;
+    @NotBlank(message = "支付单ID不能为空")
+    private String paymentId;
     private String note;
 }

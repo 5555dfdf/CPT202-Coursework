@@ -11,6 +11,8 @@ import org.example.coursework3.dto.response.ConfirmBookingPaymentResult;
 import org.example.coursework3.dto.response.CreateBookingPaymentResult;
 import org.example.coursework3.dto.response.CreateBookingResult;
 import org.example.coursework3.dto.response.RescheduleBookingResult;
+import org.example.coursework3.dto.response.UnpaidPaymentItemResult;
+import org.example.coursework3.dto.response.UnpaidPaymentsResult;
 import org.example.coursework3.entity.BookingStatus;
 import org.example.coursework3.result.Result;
 import org.example.coursework3.service.AuthService;
@@ -101,9 +103,48 @@ public class BookingController {
         return Result.success(bookingService.confirmBookingPayment(userId, id, request));
     }
 
+    @PostMapping("/{id}/payment/mock-success")
+    public Result<ConfirmBookingPaymentResult> mockSuccessPayment(@RequestHeader("Authorization") String authHeader,
+                                                                  @PathVariable String id) {
+        if (!authService.verifyAsCustomer(authHeader)) {
+            return Result.error("ERROR", "请以顾客身份支付");
+        }
+        String userId = authService.getUserIdByAuth(authHeader);
+        return Result.success(bookingService.mockSuccessPayment(userId, id));
+    }
+
     @PostMapping("/alipay/notify")
     public String alipayNotify(@RequestParam Map<String, String> params) {
         boolean ok = bookingService.handleAlipayNotify(params);
         return ok ? "success" : "failure";
+    }
+
+    @GetMapping("/unpaid-payments")
+    public Result<UnpaidPaymentsResult> listUnpaidPayments(@RequestHeader("Authorization") String authHeader) {
+        if (!authService.verifyAsCustomer(authHeader)) {
+            return Result.error("ERROR", "请以顾客身份查看");
+        }
+        String userId = authService.getUserIdByAuth(authHeader);
+        return Result.success(bookingService.listUnpaidPayments(userId));
+    }
+
+    @GetMapping("/unpaid-payments/{id}")
+    public Result<UnpaidPaymentItemResult> getUnpaidPayment(@RequestHeader("Authorization") String authHeader,
+                                                            @PathVariable String id) {
+        if (!authService.verifyAsCustomer(authHeader)) {
+            return Result.error("ERROR", "请以顾客身份查看");
+        }
+        String userId = authService.getUserIdByAuth(authHeader);
+        return Result.success(bookingService.getUnpaidPayment(userId, id));
+    }
+
+    @PostMapping("/unpaid-payments/{id}/resume")
+    public Result<CreateBookingPaymentResult> resumeUnpaidPayment(@RequestHeader("Authorization") String authHeader,
+                                                                  @PathVariable String id) {
+        if (!authService.verifyAsCustomer(authHeader)) {
+            return Result.error("ERROR", "请以顾客身份支付");
+        }
+        String userId = authService.getUserIdByAuth(authHeader);
+        return Result.success(bookingService.resumeUnpaidPayment(userId, id));
     }
 }
