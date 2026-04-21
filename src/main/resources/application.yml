@@ -32,7 +32,7 @@ alipay:
   app-id: ${ALIPAY_APP_ID}
   private-key: ${ALIPAY_PRIVATE_KEY}
   public-key: ${ALIPAY_PUBLIC_KEY}
-  notify-url: http://localhost:8080/bookings/alipay/notify
+  notify-url: ${ALIPAY_NOTIFY_URL}
 
 payment:
   mock-enabled: true
