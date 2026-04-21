@@ -20,7 +20,6 @@ import org.example.coursework3.repository.SlotRepository;
 import org.example.coursework3.repository.UserRepository;
 import org.example.coursework3.vo.MyBookingVo;
 import org.example.coursework3.vo.SingleBookingVo;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -60,8 +59,6 @@ public class CustomerBookingService {
     private final RedisTemplate<String, Object> redisTemplate;
     @Value("${payment.mock-enabled:false}")
     private boolean mockPaymentEnabled;
-//    private final Map<String, PaymentDraft> bookingPaymentDrafts = new ConcurrentHashMap<>();
-//    private final Map<String, String> bookingIdByOutTradeNo = new ConcurrentHashMap<>();
 
 
     @Transactional
@@ -109,6 +106,12 @@ public class CustomerBookingService {
     }
 
     public CreateBookingPaymentResult createBookingPayment(String userId, String paymentIntentId, CreateBookingPaymentRequest request) {
+        List<UnpaidPaymentItemResult> items = listUnpaidPayments(userId).getItems();
+        for (UnpaidPaymentItemResult result : items){
+            if (result.getSlotId().equals(request.getSlotId())){
+                throw new MsgException("您有相同时段未处理的订单");
+            }
+        }
         String specialistId = safeTrim(request == null ? null : request.getSpecialistId());
         String slotId = safeTrim(request == null ? null : request.getSlotId());
         if (specialistId.isBlank() || slotId.isBlank()) {
@@ -136,12 +139,11 @@ public class CustomerBookingService {
         String qrCodeUrl = "https://api.qrserver.com/v1/create-qr-code/?size=280x280&data="
                 + URLEncoder.encode(alipayQrRawCode, StandardCharsets.UTF_8);
 
-//        bookingPaymentDrafts.put(booking.getId(), new PaymentDraft(paymentToken, paymentToken, amount, currency, userId));
         redisTemplate.opsForValue().set(
                 PAYMENT_DRAFT_KEY + normalizedIntentId,
                 new PaymentDraft(paymentToken, paymentToken, amount, currency, userId, specialistId, slotId),
                 PAYMENT_TTL);
-//        bookingIdByOutTradeNo.put(paymentToken, booking.getId());
+
         redisTemplate.opsForValue().set(
                 OUT_TRADE_KEY + paymentToken,
                 normalizedIntentId,
@@ -154,7 +156,6 @@ public class CustomerBookingService {
     }
 
     public ConfirmBookingPaymentResult confirmBookingPayment(String userId, String paymentIntentId, ConfirmBookingPaymentRequest request) {
-//        PaymentDraft draft = bookingPaymentDrafts.get(booking.getId());
         PaymentDraft draft = (PaymentDraft) redisTemplate.opsForValue()
                 .get(PAYMENT_DRAFT_KEY + paymentIntentId);
         if (draft == null) {
