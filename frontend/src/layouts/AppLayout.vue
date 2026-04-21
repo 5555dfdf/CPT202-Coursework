@@ -91,12 +91,46 @@ function formatRemain(seconds) {
   return `${mm}:${String(ss).padStart(2, '0')}`
 }
 
+const countdownMap = ref({})
+let countdownTimer = null
+
+function startCountdown() {
+  if (countdownTimer) return
+
+  countdownTimer = setInterval(() => {
+    const map = countdownMap.value
+
+    Object.keys(map).forEach(id => {
+      if (map[id] > 0) {
+        map[id]--
+      }
+    })
+  }, 1000)
+}
+
+function stopCountdown() {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+}
+
 async function loadUnpaidPayments() {
   if (role.value !== 'Customer') return
   unpaidLoading.value = true
   unpaidError.value = ''
   try {
-    unpaidItems.value = await api.listUnpaidPayments()
+    const list = await api.listUnpaidPayments()
+    unpaidItems.value = list
+
+    // 初始化 / 更新倒计时
+    const map = {}
+    list.forEach(item => {
+      const id = String(item.paymentIntentId)
+      map[id] = Number(item.remainingSeconds ?? 0)
+    })
+    countdownMap.value = map
+
   } catch (e) {
     unpaidError.value = e?.message || 'Failed to load unpaid orders'
     unpaidItems.value = []
@@ -221,20 +255,25 @@ async function mockPaymentFromPanel() {
 watch(role, (nextRole) => {
   if (nextRole === 'Customer') {
     startUnpaidPolling()
+    startCountdown()
   } else {
     stopUnpaidPolling()
+    stopCountdown()
     unpaidItems.value = []
+    countdownMap.value = {}
   }
 }, { immediate: true })
 
 onMounted(() => {
   if (role.value === 'Customer') {
     startUnpaidPolling()
+    startCountdown()
   }
 })
 
 onBeforeUnmount(() => {
   stopUnpaidPolling()
+  stopCountdown()
 })
 </script>
 
@@ -305,7 +344,7 @@ onBeforeUnmount(() => {
             <li v-for="item in unpaidItems" :key="item.paymentIntentId" class="unpaid-float__row">
               <div class="unpaid-float__line">{{ item.slotLabel || item.slotId }}</div>
               <div class="unpaid-float__meta">
-                {{ Number(item.amount ?? 0).toFixed(2) }} {{ item.currency || 'CNY' }} · {{ formatRemain(item.remainingSeconds) }}
+                {{ Number(item.amount ?? 0).toFixed(2) }} {{ item.currency || 'CNY' }} · {{ formatRemain(countdownMap[item.paymentIntentId]) }}
               </div>
               <button
                 type="button"
