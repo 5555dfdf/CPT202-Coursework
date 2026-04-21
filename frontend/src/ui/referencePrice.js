@@ -11,5 +11,5 @@ export function formatReferencePrice(amount, currency = DEFAULT_REFERENCE_CURREN
   const value = normalizeAmount(amount)
   const unit = String(currency || DEFAULT_REFERENCE_CURRENCY).trim() || DEFAULT_REFERENCE_CURRENCY
   if (value === '--') return '--'
-  return `${value} ${unit}`
+  return `${value} ${unit}/hour`
 }

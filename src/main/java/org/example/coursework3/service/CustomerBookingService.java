@@ -18,9 +18,11 @@ import org.example.coursework3.repository.SlotRepository;
 import org.example.coursework3.repository.UserRepository;
 import org.example.coursework3.vo.MyBookingVo;
 import org.example.coursework3.vo.SingleBookingVo;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -32,7 +34,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+
 
 @Service
 @RequiredArgsConstructor
@@ -44,26 +46,12 @@ public class CustomerBookingService {
     private final AliyunMailService aliyunMailService;
     private final AlipayGatewayService alipayGatewayService;
     private final BookingHistoryRepository bookingHistoryRepository;
-    private final Map<String, PaymentDraft> bookingPaymentDrafts = new ConcurrentHashMap<>();
-    private final Map<String, String> bookingIdByOutTradeNo = new ConcurrentHashMap<>();
+    private static final String PAYMENT_DRAFT_KEY = "booking:payment:draft:";
+    private static final String OUT_TRADE_KEY = "booking:payment:outTrade:";
+    private final RedisTemplate<String, Object> redisTemplate;
+//    private final Map<String, PaymentDraft> bookingPaymentDrafts = new ConcurrentHashMap<>();
+//    private final Map<String, String> bookingIdByOutTradeNo = new ConcurrentHashMap<>();
 
-    private static class PaymentDraft {
-        private final String outTradeNo;
-        private final String paymentId;
-        private final Double amount;
-        private final String currency;
-        private final String customerId;
-        private volatile boolean paid;
-
-        private PaymentDraft(String outTradeNo, String paymentId, Double amount, String currency, String customerId) {
-            this.outTradeNo = outTradeNo;
-            this.paymentId = paymentId;
-            this.amount = amount;
-            this.currency = currency;
-            this.customerId = customerId;
-            this.paid = false;
-        }
-    }
 
     @Transactional
     public CreateBookingResult creatBooking(String userId, CreateBookingRequest request) {
@@ -91,43 +79,61 @@ public class CustomerBookingService {
         double amount = resolvePaymentAmount(request, slot);
         String currency = resolveCurrency(request, slot);
         String normalizedAmount = String.format(Locale.US, "%.2f", amount);
-        String outTradeNo = buildOutTradeNo(booking.getId());
+        String paymentToken = buildPaymentToken(booking.getId());
         String subject = "Booking " + booking.getId();
-        String alipayQrRawCode = alipayGatewayService.precreate(outTradeNo, normalizedAmount, subject);
+        String alipayQrRawCode = alipayGatewayService.precreate(paymentToken, normalizedAmount, subject);
         String qrCodeUrl = "https://api.qrserver.com/v1/create-qr-code/?size=280x280&data="
                 + URLEncoder.encode(alipayQrRawCode, StandardCharsets.UTF_8);
 
-        String paymentId = outTradeNo;
-        bookingPaymentDrafts.put(booking.getId(), new PaymentDraft(outTradeNo, paymentId, amount, currency, userId));
-        bookingIdByOutTradeNo.put(outTradeNo, booking.getId());
-        return new CreateBookingPaymentResult(paymentId, outTradeNo, qrCodeUrl, amount, currency);
+//        bookingPaymentDrafts.put(booking.getId(), new PaymentDraft(paymentToken, paymentToken, amount, currency, userId));
+        redisTemplate.opsForValue().set(
+                PAYMENT_DRAFT_KEY + booking.getId(),
+                new PaymentDraft(paymentToken, paymentToken, amount, currency, userId),
+                Duration.ofMinutes(15));
+//        bookingIdByOutTradeNo.put(paymentToken, booking.getId());
+        redisTemplate.opsForValue().set(
+                OUT_TRADE_KEY + paymentToken,
+                booking.getId(),
+                Duration.ofMinutes(15)
+        );
+        log.info("create outTradeNo: {}", paymentToken);
+        return new CreateBookingPaymentResult(paymentToken, paymentToken, qrCodeUrl, amount, currency);
     }
 
     public ConfirmBookingPaymentResult confirmBookingPayment(String userId, String bookingId, ConfirmBookingPaymentRequest request) {
         Booking booking = getOwnedBooking(userId, bookingId);
-        PaymentDraft draft = bookingPaymentDrafts.get(booking.getId());
+//        PaymentDraft draft = bookingPaymentDrafts.get(booking.getId());
+        PaymentDraft draft = (PaymentDraft) redisTemplate.opsForValue()
+                .get(PAYMENT_DRAFT_KEY + booking.getId());
         if (draft == null) {
             throw new MsgException("请先创建支付单");
         }
-        if (!draft.customerId.equals(userId)) {
+        if (!draft.getCustomerId().equals(userId)) {
             throw new MsgException("无权限操作该支付单");
         }
         String paymentId = safeTrim(request == null ? null : request.getPaymentId());
-        if (!paymentId.isBlank() && !draft.paymentId.equals(paymentId)) {
+        if (!paymentId.isBlank() && !draft.getPaymentId().equals(paymentId)) {
             throw new MsgException("支付单不匹配");
         }
 
-        if (draft.paid) {
-            return new ConfirmBookingPaymentResult(booking.getId(), draft.paymentId, "SUCCESS", booking.getStatus());
+        if (draft.isPaid()) {
+            return new ConfirmBookingPaymentResult(booking.getId(), draft.getPaymentId(), "SUCCESS", booking.getStatus());
         }
 
-        String tradeStatus = alipayGatewayService.queryTradeStatus(draft.outTradeNo);
+        log.info("query outTradeNo: {}", draft.getOutTradeNo());
+
+        String tradeStatus = alipayGatewayService.queryTradeStatus(draft.getOutTradeNo());
         if (!isAlipaySuccess(tradeStatus)) {
             throw new MsgException("支付未完成，当前状态: " + safeTrim(tradeStatus));
         }
 
-        draft.paid = true;
-        return new ConfirmBookingPaymentResult(booking.getId(), draft.paymentId, "SUCCESS", booking.getStatus());
+        draft.setPaid(true);
+        redisTemplate.opsForValue().set(
+                PAYMENT_DRAFT_KEY + booking.getId(),
+                draft,
+                Duration.ofMinutes(15)
+        );
+        return new ConfirmBookingPaymentResult(booking.getId(), draft.getPaymentId(), "SUCCESS", booking.getStatus());
     }
 
     public boolean handleAlipayNotify(Map<String, String> notifyParams) {
@@ -143,13 +149,21 @@ public class CustomerBookingService {
         if (!isAlipaySuccess(tradeStatus)) {
             return false;
         }
-        String bookingId = bookingIdByOutTradeNo.get(outTradeNo);
+//        String bookingId = bookingIdByOutTradeNo.get(outTradeNo);
+        String bookingId = (String) redisTemplate.opsForValue()
+                .get(OUT_TRADE_KEY + outTradeNo);
         if (bookingId == null) {
             return false;
         }
-        PaymentDraft draft = bookingPaymentDrafts.get(bookingId);
+        PaymentDraft draft = (PaymentDraft) redisTemplate.opsForValue()
+                .get(PAYMENT_DRAFT_KEY + bookingId);
         if (draft != null) {
-            draft.paid = true;
+            draft.setPaid(true);
+            redisTemplate.opsForValue().set(
+                    PAYMENT_DRAFT_KEY + bookingId,
+                    draft,
+                    Duration.ofMinutes(15)
+            );
         }
         return true;
     }
@@ -272,7 +286,7 @@ public class CustomerBookingService {
         return "TRADE_SUCCESS".equalsIgnoreCase(status) || "TRADE_FINISHED".equalsIgnoreCase(status);
     }
 
-    private String buildOutTradeNo(String bookingId) {
+    private String buildPaymentToken(String bookingId) {
         long now = System.currentTimeMillis();
         String compactId = bookingId == null ? "booking" : bookingId.replace("-", "");
         if (compactId.length() > 20) {
