@@ -391,6 +391,15 @@ onBeforeUnmount(() => {
             <p v-if="paymentError" class="payment-banner">{{ paymentError }}</p>
           </div>
           <footer class="payment-modal-foot">
+            <div class="payment-qr-tip-wrap">
+              <span class="payment-qr-icon">!</span>
+              <div class="payment-qr-tooltip">
+                Please use Mock Payment!<br>
+                Only support QR code payment on the Android sandbox version of Alipay!<br>
+                Test Account: ruaalx2721@sandbox.com<br>
+                Password: 111111
+              </div>
+            </div>
             <button type="button" class="payment-btn-secondary" :disabled="paymentBusy" @click="cancelPaymentFromPanel">Cancel</button>
             <button type="button" class="payment-btn-secondary" :disabled="paymentBusy" @click="mockPaymentFromPanel">Mock Payment</button>
             <button type="button" class="payment-btn-submit" :disabled="paymentBusy" @click="confirmPaymentFromPanel">
@@ -404,6 +413,55 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.payment-qr-tip-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+  margin-top: 12px;
+}
+
+/* 感叹号 */
+.payment-qr-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #faad14;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+
+}
+
+/* tooltip 本体 */
+.payment-qr-tooltip {
+  position: absolute;
+  bottom: 130%; /* 在上方 */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 240px;
+
+  background: #111827;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.4;
+
+  padding: 8px 10px;
+  border-radius: 6px;
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+/* hover 显示 */
+.payment-qr-tip-wrap:hover .payment-qr-tooltip {
+  opacity: 1;
+}
 .app {
   min-height: 100vh;
   background: #F0EAE5;

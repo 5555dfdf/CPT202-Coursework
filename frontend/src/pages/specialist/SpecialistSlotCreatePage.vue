@@ -281,6 +281,13 @@ onMounted(async () => {
         </label>
 
         <div class="form-actions">
+          <div class="tip-wrap">
+            <span class="icon">!</span>
+            <div class="tooltip">
+              Please follow your recommended Price!<br>
+              Otherwise you will be punished!
+            </div>
+          </div>
           <button 
             type="button" 
             class="btn-secondary" 
@@ -304,6 +311,55 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.tip-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+  margin-top: 12px;
+}
+
+/* 感叹号 */
+.icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #faad14;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+
+}
+
+/* tooltip 本体 */
+.tooltip {
+  position: absolute;
+  bottom: 130%; /* 在上方 */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 240px;
+
+  background: #111827;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.4;
+
+  padding: 8px 10px;
+  border-radius: 6px;
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+/* hover 显示 */
+.tip-wrap:hover .tooltip {
+  opacity: 1;
+}
 .page__header {
   margin: 8px 0 20px;
   padding: 0;
