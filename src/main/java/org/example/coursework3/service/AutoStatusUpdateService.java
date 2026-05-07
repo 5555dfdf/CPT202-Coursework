@@ -16,9 +16,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
-/**Service for automatically updating booking statuses based on time rules including auto-cancel
-and auto-complete
- **/
+
 @Slf4j
 @Service
 public class AutoStatusUpdateService {
@@ -34,7 +32,12 @@ public class AutoStatusUpdateService {
     @Autowired
     private SlotRepository slotRepository;
 
-    // Check every 5 minutes, auto-cancel 10 minutes before the event
+    /**
+     * Scheduled task to auto-cancel 'Pending' bookings that have not been confirmed by the specialist.
+     * Runs every 5 minutes.
+     * Logic: If the current time is within 10 minutes of the slot's start time, the
+     * booking is marked as 'Cancelled' to prevent last-minute scheduling uncertainty.
+     */
     @Scheduled(fixedRate = 300000)
     @Transactional
     public void cancelUnconfirmedBeforeStart() {
@@ -55,7 +58,12 @@ public class AutoStatusUpdateService {
             }
         }
     }
-    // Check every 5 minutes, auto-complete event after 2 hours
+    /**
+     * Scheduled task to auto-complete 'Confirmed' bookings that have already finished.
+     * Runs every 5 minutes.
+     * Logic: If the current time is more than 2 hours past the slot's end time,
+     * the booking is marked as 'Completed'.
+     */
     @Scheduled(fixedRate = 300000)
     @Transactional
     public void autoCompleteConfirmedBookings() {

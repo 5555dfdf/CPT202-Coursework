@@ -25,7 +25,14 @@ import java.util.List;
 public class SpecialistsInfoService {
 
     private final SpecialistsRepository specialistRepository;
-
+    /**
+     * Retrieves the full profile details for a specific specialist.
+     * Includes biographical information, pricing, and a mapped list of expertise categories.
+     *
+     * @param id The unique identifier of the specialist.
+     * @return A {@link SpecialistsDetailVo} containing the specialist's comprehensive data.
+     * @throws RuntimeException if the specialist record is not found in the database.
+     */
     @Transactional(readOnly = true)
     public SpecialistsDetailVo getSpecialistDetail(String id) {
         Specialist specialist = specialistRepository.findById(id).orElseThrow(() -> new RuntimeException("specialist not found: " + id));
@@ -39,14 +46,22 @@ public class SpecialistsInfoService {
                 specialist.getPrice()
         );
     }
-
+    /**
+     * Retrieves a paginated list of specialists, optionally filtered by a specific expertise category.
+     *
+     * @param expertiseId Optional: The ID of an expertise category to filter results.
+     * @param page        The current page number (1-based index).
+     * @param pageSize    The maximum number of records to return per page.
+     * @return A {@link SpecialistsPageVo} containing the current page items and total record count.
+     */
     @Transactional(readOnly = true)
     public SpecialistsPageVo getSpecialists(String expertiseId, int page, int pageSize) {
+        // Ensure safe pagination parameters
         int safePage = Math.max(page, 1);
         int safePageSize = Math.max(pageSize, 1);
         Pageable pageable = PageRequest.of(safePage - 1, safePageSize);
         Page<Specialist> specialistPage;
-
+        // Perform conditional database query
         if (expertiseId != null && !expertiseId.isBlank()) {
             specialistPage = specialistRepository.findDistinctByExpertises_Id(expertiseId, pageable);
         } else {
@@ -54,7 +69,7 @@ public class SpecialistsInfoService {
         }
 
         List<SpecialistsVo> items = new ArrayList<>();
-
+        // Transform entities to View Objects
         for (Specialist s : specialistPage.getContent()) {
 //            if (s.getStatus()== SpecialistStatus.Inactive){
 //                continue;

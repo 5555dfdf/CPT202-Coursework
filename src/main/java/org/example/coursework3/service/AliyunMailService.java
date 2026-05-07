@@ -18,6 +18,16 @@ public class AliyunMailService {
     @Value("${aliyun.mail.from-address}")
     private String fromAddress;
 
+
+    /**
+     * Initializes the Aliyun DM Client using access credentials and region configuration.
+     *
+     * @param keyId         Aliyun AccessKey ID
+     * @param keySecret     Aliyun AccessKey Secret
+     * @param region        Aliyun region ID
+     * @param redisTemplate Spring Data Redis template for key-value storage
+     * @throws Exception    If client initialization fails
+     */
     public AliyunMailService(
             @Value("${aliyun.mail.access-key-id}") String keyId,
             @Value("${aliyun.mail.access-key-secret}") String keySecret,
@@ -31,7 +41,14 @@ public class AliyunMailService {
         config.endpoint = "dm.aliyuncs.com";
         this.client = new com.aliyun.dm20151123.Client(config);
     }
-
+    /**
+     * Generates a 6-digit captcha, stores it in Redis, and sends it to the recipient.
+     * This method is executed asynchronously to prevent blocking the main thread
+     * during the SMTP/API call.
+     *
+     * @param toAddress  The recipient's email address.
+     * @throws Exception If email delivery via Aliyun DM fails.
+     */
     @Async("taskExecutor")
     public void sendCaptcha(String toAddress) throws Exception {
         String code = String.valueOf((int)((Math.random() * 9 + 1) * 100000));
@@ -49,7 +66,15 @@ public class AliyunMailService {
         client.singleSendMail(request);
     }
 
-    // send emails to specialists when the slot is cancelled to notify that the slot is now available
+    /**
+     * Sends an asynchronous email notification to a specialist when a booking is canceled.
+     * This method informs the specialist that their specific time slot has been freed
+     * and is now available for other clients to book.
+     *
+     * @param toAddress The specialist's email address.
+     * @param slotInfo  A formatted string describing the canceled slot.
+     * @throws Exception If the Aliyun DM API call fails.
+     */
     @Async
     public void sendCancellationNoticeToSpecialist(String toAddress, String slotInfo) throws Exception {
 
@@ -71,7 +96,18 @@ public class AliyunMailService {
         client.singleSendMail(request);
     }
 
-    // send a generic status update notification to either a customer or a specialist
+    /**
+     * Sends a versatile, asynchronous status update notification to either a specialist or a customer.
+     * This generic method handles various state changes in the booking lifecycle, including
+     * confirmation, completion, or administrative adjustments.
+     *
+     * @param toAddress  The recipient's email address.
+     * @param role       The recipient's role used in the salutation.
+     * @param status     The new status of the booking.
+     * @param slotInfo   Formatted time information for the appointment.
+     * @param note       An optional message or reason to include in the body.
+     * @throws Exception If the Aliyun DM API call fails.
+     */
     @Async
     public void sendGenericStatusNotification(String toAddress, String role, String status, String slotInfo, String note) throws Exception {
         // email head

@@ -26,9 +26,20 @@ public class SlotInfoService {
     private BookingRepository bookingRepository;
     @Autowired
     private UserRepository userRepository;
-
+    /**
+     * Retrieves a list of slots for a specific specialist, filtered by date and time constraints.
+     * Each slot is enriched with information about the most recent booking and the customer's name.
+     *
+     * @param specialistId The unique ID of the specialist.
+     * @param date         Optional: Filter by a specific date (ISO_LOCAL_DATE format: yyyy-MM-dd).
+     * @param from         Optional: Filter slots starting at or after this timestamp (ISO_OFFSET_DATE_TIME).
+     * @param to           Optional: Filter slots starting at or before this timestamp (ISO_OFFSET_DATE_TIME).
+     * @return A list of {@link SlotVo} containing detailed slot and booking information.
+     */
     public List<SlotVo> getSpecialistSlots(String specialistId, String date, String from, String to) {
+        //  Initial retrieval of all slots assigned to the specialist
         List<Slot> allSlots = slotRepository.findBySpecialistId(specialistId);
+        // Parse input parameters into temporal objects
         LocalDate localDate = null;
         if (date != null && !date.isEmpty()){
             localDate = LocalDate.parse(date, DateTimeFormatter.ISO_LOCAL_DATE);
@@ -45,6 +56,7 @@ public class SlotInfoService {
         } else {
             toTime = null;
         }
+        // If a specific date is provided, filter for slots within that 24-hour window (UTC)
         if (date != null) {
             OffsetDateTime startOfDay = localDate.atStartOfDay().atOffset(java.time.ZoneOffset.UTC);
             OffsetDateTime endOfDay = startOfDay.plusDays(1);

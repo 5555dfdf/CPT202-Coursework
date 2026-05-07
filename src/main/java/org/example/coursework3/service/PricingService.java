@@ -24,7 +24,14 @@ public class PricingService {
 
     private final PricingRepository pricingRepository;
     private final SpecialistsRepository specialistsRepository;
-
+    /**
+     * Retrieves a price quote based on the provided request parameters.
+     * The method uses a fallback hierarchy: Specialist + Duration + Type -> Specialist + Duration -> Specialist + Type.
+     *
+     * @param request Contains specialistId, and optional duration and type.
+     * @return A list of matching price quotes.
+     * @throws MsgException if specialistId is missing or if no pricing is found.
+     */
     public List<PricingQuoteResult> getQuote(PricingQuoteRequest request) {
         String specialistId = request.getSpecialistId();
         Integer duration = request.getDuration();
@@ -70,7 +77,14 @@ public class PricingService {
 
         return results;
     }
-
+    /**
+     * Lists pricing rules filtered by specialist, duration, or type.
+     *
+     * @param specialistId Optional filter for specialist ID.
+     * @param duration     Optional filter for session duration.
+     * @param type         Optional filter for service type (e.g., online, offline).
+     * @return A list of filtered PricingRuleVo objects.
+     */
     public List<PricingRuleVo> listRules(String specialistId, Integer duration, String type) {
         String normalizedSpecialistId = normalizeSpecialistIdForQuery(specialistId);
         String normalizedType = normalizeTypeForQuery(type);
@@ -85,13 +99,20 @@ public class PricingService {
                 .map(PricingRuleVo::fromEntity)
                 .collect(Collectors.toList());
     }
-
+    /**
+     * Retrieves a single pricing rule by its unique ID.
+     */
     public PricingRuleVo getRule(String id) {
         Pricing pricing = pricingRepository.findById(id)
                 .orElseThrow(() -> new MsgException("pricing rule not found"));
         return PricingRuleVo.fromEntity(pricing);
     }
-
+    /**
+     * Creates a new pricing rule after validating inputs and uniqueness.
+     *
+     * @param request Data for the new pricing rule.
+     * @return The created PricingRuleVo.
+     */
     @Transactional
     public PricingRuleVo createRule(PricingRuleRequest request) {
         if (request == null) {
@@ -118,7 +139,9 @@ public class PricingService {
         pricingRepository.save(pricing);
         return PricingRuleVo.fromEntity(pricing);
     }
-
+    /**
+     * Updates an existing pricing rule.
+     */
     @Transactional
     public PricingRuleVo updateRule(String id, PricingRuleRequest request) {
         if (request == null) {
@@ -147,7 +170,9 @@ public class PricingService {
         pricingRepository.save(pricing);
         return PricingRuleVo.fromEntity(pricing);
     }
-
+    /**
+     * Deletes a pricing rule by ID.
+     */
     @Transactional
     public void deleteRule(String id) {
         if (id == null || id.isBlank()) {
@@ -164,7 +189,9 @@ public class PricingService {
             throw new MsgException("specialist not found");
         }
     }
-
+    /**
+     * Checks if a rule with the same specialist, duration, and type already exists in the database.
+     */
     private void ensureUniqueRule(String specialistId, Integer duration, String type, String selfId) {
         boolean exists = selfId == null
                 ? pricingRepository.existsBySpecialistIdAndDurationAndType(specialistId, duration, type)
@@ -208,13 +235,13 @@ public class PricingService {
         }
         return value;
     }
-
+    /** Normalizes type strings to lowercase for consistent database storage and lookup. */
     private String normalizeTypeForQuery(String type) {
         if (type == null) return null;
         String value = type.trim().toLowerCase();
         return value.isEmpty() ? null : value;
     }
-
+    /** Validates the amount and rounds it to 2 decimal places. */
     private BigDecimal normalizeAmount(BigDecimal amount) {
         if (amount == null) {
             throw new MsgException("amount is required");
@@ -224,7 +251,7 @@ public class PricingService {
         }
         return amount.setScale(2, RoundingMode.HALF_UP);
     }
-
+    /** Defaults currency to CNY if not provided and normalizes it to uppercase. */
     private String normalizeCurrency(String currency) {
         String value = currency == null ? "CNY" : currency.trim().toUpperCase();
         if (value.isEmpty()) {

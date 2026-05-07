@@ -55,7 +55,7 @@ public class AdminService {
             throw new MsgException("This email is already registered.");
         }
 
-        // 1. 保存用户
+        // 1. save users
         User user = new User();
         user.setName(request.getName());
         user.setEmail(request.getUserEmail());
@@ -63,7 +63,7 @@ public class AdminService {
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         userRepository.save(user);
 
-        // 2. 创建专家
+        // 2. create specialists
         Specialist specialist = new Specialist(user.getId(), user.getName(), request.getPrice(), request.getBio());
         List<Expertise> expertiseList = new ArrayList<>();
         for (String expertiseId : request.getExpertiseIds()) {
@@ -75,7 +75,10 @@ public class AdminService {
         specialistsRepository.save(specialist);
         return specialist;
     }
-
+    /**
+     * Updates an existing specialist's information.
+     * Synchronizes name changes between the User and Specialist tables.
+     */
     public Specialist updateSpecialist(String id, EditSpecialistRequest request) {
         Specialist specialist;
         try {
@@ -83,6 +86,7 @@ public class AdminService {
         } catch (Exception e) {
             throw new MsgException("This specialist does not exist");
         }
+        // Update user-level details
         if (request.getName() != null) {
             User user = userRepository.findById(id);
             user.setName(request.getName());
@@ -98,6 +102,7 @@ public class AdminService {
         if (request.getStatus() != null) {
             specialist.setStatus(request.getStatus());
         }
+        // Refresh expertise associations
         if (request.getExpertiseIds() != null) {
             List<Expertise> expertiseList = new ArrayList<>();
             for (String expertiseId : request.getExpertiseIds()) {
@@ -110,7 +115,9 @@ public class AdminService {
         specialistsRepository.save(specialist);
         return specialist;
     }
-
+    /**
+     * Updates the active status of a specialist and invalidates their current session.
+     */
     @Transactional
     public Specialist updateSpecialistStatus(String id, SpecialistStatus status) {
         Specialist specialist;
@@ -125,6 +132,10 @@ public class AdminService {
         return specialist;
     }
 
+    /**
+     * Clears authentication tokens from Redis for a specific user.
+     * Handles the bidirectional mapping: auth:user:{uid} -> token AND auth:token:{token} -> uid.
+     */
     public void deleteTokenByUserId(String userId) {
 
         String userKey = "auth:user:" + userId;
@@ -134,20 +145,23 @@ public class AdminService {
             return;
         }
 
-        // 1. 获取当前用户对应的 token
+        // 1. Retrieve the active token associated with this user
         String token = redisTemplate.opsForValue().get(userKey);
 
         if (token != null) {
             String tokenKey = "auth:token:" + token;
 
-            // 2. 删除 token -> userId
+            // 2. delete userId -> token
             redisTemplate.delete(tokenKey);
         }
 
-        // 3. 删除 userId -> token
+        // 3. delete userId -> token
         redisTemplate.delete(userKey);
     }
-
+    /**
+     * Performs a batch update on multiple specialists' statuses.
+     * Aggregates successes and failures into a result VO.
+     */
     @Transactional
     public BatchUpdateSpecialistStatusResultVo batchUpdateSpecialistStatus(List<String> ids, SpecialistStatus status) {
         if (ids == null || ids.isEmpty()) {
@@ -184,7 +198,9 @@ public class AdminService {
                 failures
         );
     }
-
+    /**
+     * Generates a CSV string containing all specialists sorted by creation date (descending).
+     */
     @Transactional(readOnly = true)
     public String exportSpecialistsCsv() {
         List<Specialist> specialists = specialistsRepository.findAll().stream()
@@ -213,7 +229,9 @@ public class AdminService {
         }
         return csv.toString();
     }
-
+    /**
+     * Deletes both the Specialist profile and the associated User account.
+     */
     @Transactional
     public void deleteSpecialist(String id) {
         User user = userRepository.getUserById(id);
@@ -221,7 +239,9 @@ public class AdminService {
         specialistsRepository.delete(specialist);
         userRepository.delete(user);
     }
-
+    /**
+     * Creates a new Expertise category for specialists to subscribe to.
+     */
     public Expertise createExpertise(String name, String description) {
         if (expertiseRepository.existsByName(name)) {
             throw new MsgException("This expertise has already existed!");
@@ -232,7 +252,9 @@ public class AdminService {
         expertiseRepository.save(expertise);
         return expertise;
     }
-
+    /**
+     * Updates existing Expertise category details.
+     */
     @Transactional
     public Expertise updateExpertise(String id, String name, String description) {
         Expertise expertise = null;
@@ -246,14 +268,18 @@ public class AdminService {
         expertiseRepository.save(expertise);
         return expertise;
     }
-
+    /**
+     * Removes an Expertise category from the system.
+     */
     public void deleteExpertise(String id) {
         if (!expertiseRepository.existsById(id)) {
             throw new MsgException("Please enter correct expertise ID");
         }
         expertiseRepository.deleteById(id);
     }
-
+    /**
+     * Filters and lists time slots based on specialist, date range, and availability.
+     */
     public List<AdminSlotVo> listSlots(String specialistId, String date, String from, String to, Boolean available) {
         List<Slot> slots;
         if (specialistId != null && !specialistId.isBlank()) {
@@ -299,7 +325,10 @@ public class AdminService {
 
         return result;
     }
-
+    /**
+     * Creates a new appointment slot for a specialist.
+     * Validates that the new slot does not overlap with existing slots for that specialist.
+     */
     public AdminSlotVo createSlot(SlotRequest request) {
         if (request == null) {
             throw new MsgException("Payload can't be null");
@@ -343,7 +372,10 @@ public class AdminService {
         slotRepository.save(slot);
         return AdminSlotVo.form(slot);
     }
-
+    /**
+     * Updates an existing time slot.
+     * Prevents modification of status if there are active bookings (Pending/Confirmed).
+     */
     public AdminSlotVo updateSlot(String id, SlotRequest request) {
         Slot slot = slotRepository.getSlotById(id);
         if (slot == null) {
@@ -406,7 +438,9 @@ public class AdminService {
         slotRepository.save(slot);
         return AdminSlotVo.form(slot);
     }
-
+    /**
+     * Checks if a slot is "free" (has no active Pending or Confirmed bookings).
+     */
     public boolean whetherFree(String slotId){
         List<Booking> bookingList = bookingRepository.getBookingBySlotId(slotId);
         for (Booking booking : bookingList){
@@ -455,11 +489,11 @@ public class AdminService {
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
 
-        // 2. 解析日期和时间字符串为 LocalDate/LocalTime
+        // Parse date and time strings into LocalDate/LocalTime
         LocalDate localDate = LocalDate.parse(date, dateFormatter);
         LocalTime localTime = LocalTime.parse(time, timeFormatter);
 
-        // 3. 拼接为 LocalDateTime 并返回
+        // Concat into LocalDateTime and return
         return LocalDateTime.of(localDate, localTime);
     }
 
@@ -528,7 +562,9 @@ public class AdminService {
         }
         return escaped;
     }
-
+    /**
+     * Lists all bookings with manual pagination and enrichment of user/slot names.
+     */
     public BookingPageResult listBookings(Integer page, Integer pageSize) {
         int safePage = page == null || page < 1 ? 1 : page;
         int safePageSize = pageSize == null || pageSize < 1 ? 10 : pageSize;
@@ -544,7 +580,9 @@ public class AdminService {
         List<Booking> pageItems = bookingList.subList(start, end);
         return BookingPageResult.of(pageItems, total, safePage, safePageSize);
     }
-
+    /**
+     * Formats slot time into a readable string.
+     */
     public String setTimeInfo(String slotId){
         DateTimeFormatter timeFmtDate = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         DateTimeFormatter timeFmtTime = DateTimeFormatter.ofPattern("HH:mm");
@@ -564,7 +602,9 @@ public class AdminService {
         return AdminSlotVo.form(slot);
 
     }
-
+    /**
+     * Exports all bookings to a CSV format for administrative reporting.
+     */
     public String exportBookingssCsv() {
         List<Booking> bookings = bookingRepository.findAll().stream()
                 .sorted((a, b) -> {

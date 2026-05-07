@@ -22,7 +22,16 @@ public class AutoSlotUpdateService {
     private SlotRepository slotRepository;
 
 
-    //5分钟一次检查，临场10分钟取消
+    /**
+     * Scheduled task that runs every 5 minutes (300,000 milliseconds).
+     * It scans the database for slots that are currently marked as 'available'
+     * but are starting within the next 10 minutes.
+     *
+     * Logic:
+     * 1. Calculate the 'cutoff' time (current time + 10 minutes).
+     * 2. Query all available slots where the start time is before this cutoff.
+     * 3. Batch update these slots to 'available = false'.
+     */
     @Scheduled(fixedRate = 300000)
     @Transactional
     public void autoInactiveSlot(){

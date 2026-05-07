@@ -33,7 +33,15 @@ public class SpecialistBookingService {
     private BookingHistoryRepository bookingHistoryRepository;
     @Autowired
     private AliyunMailService aliyunMailService;
-
+    /**
+     * Retrieves a paginated list of bookings for the authenticated specialist.
+     *
+     * @param authHeader The Bearer token for identity verification.
+     * @param status     Optional filter for booking status (e.g., PENDING, CONFIRMED).
+     * @param page       Current page number (starts from 1).
+     * @param pageSize   Number of records per page.
+     * @return A paginated result containing BookingRequest VOs enriched with customer and slot data.
+     */
     public BookingPageResult getSpecialistBookings(String authHeader, String status, Integer page, Integer pageSize) {
         // extract and verify specialist identity
         String token = authHeader.replace("Bearer ","");
@@ -81,8 +89,10 @@ public class SpecialistBookingService {
 
         return BookingPageResult.of(voList, bookingPage.getTotalElements(),page,pageSize);
     }
-
-    // confirm booking - transfer 'Pending' to 'Confirmed'
+    /**
+     * Confirms a pending booking.
+     * Transitions status from 'Pending' to 'Confirmed' and locks the associated slot.
+     */
     public BookingActionResult confirmBooking(String authHeader, String bookingId) {
         String token = authHeader.replace("Bearer ","");
         String specialistId = authService.getUserIdByToken(token);
@@ -104,7 +114,10 @@ public class SpecialistBookingService {
         slotRepository.save(slot);
         return new BookingActionResult(bookingId, BookingStatus.Confirmed);
     }
-    // reject booking - transfer 'Pending' to 'Rejected'
+    /**
+     * Rejects a pending booking request with a reason.
+     * Transitions status to 'Rejected' and releases the slot for other customers.
+     */
     @Transactional
     public BookingActionResult rejectBooking(String authHeader, String bookingId, String reason) {
 
@@ -130,7 +143,9 @@ public class SpecialistBookingService {
         slotRepository.save(slot);
         return new BookingActionResult(bookingId, BookingStatus.Rejected);
     }
-    // complete booking - transfer 'Confirmed' into 'Completed'
+    /**
+     * Marks a confirmed booking as completed.
+     */
     public BookingActionResult completeBooking(String authHeader, String bookingId) {
         String token = authHeader.replace("Bearer ","");
         String specialistId = authService.getUserIdByToken(token);
@@ -147,7 +162,9 @@ public class SpecialistBookingService {
         bookingRepository.save(booking);
         return new BookingActionResult(bookingId, BookingStatus.Completed);
     }
-    // get detailed information for a specific booking.
+    /**
+     * Fetches detailed information for a specific booking.
+     */
     public SingleBookingVo getSingleBookingInfo(String bookingId){
         Booking booking = bookingRepository.getBookingById(bookingId);
         Slot slot = slotRepository.getSlotById(booking.getSlotId());

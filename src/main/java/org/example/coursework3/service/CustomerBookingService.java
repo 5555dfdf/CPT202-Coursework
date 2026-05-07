@@ -60,13 +60,19 @@ public class CustomerBookingService {
     @Value("${payment.mock-enabled:false}")
     private boolean mockPaymentEnabled;
 
-
+    /**
+     * Finalizes the booking after a successful payment.
+     * Validates that the payment draft exists, is paid, and matches the requested slot/specialist.
+     *
+     * @return CreateBookingResult containing the new booking ID and status.
+     */
     @Transactional
     public CreateBookingResult creatBooking(String userId, CreateBookingRequest request) {
         String paymentId = safeTrim(request.getPaymentId());
         if (paymentId.isBlank()) {
             throw new MsgException("Please complete payment first");
         }
+        // Verify payment validity via Redis mappings
         String paymentIntentId = (String) redisTemplate.opsForValue().get(OUT_TRADE_KEY + paymentId);
         if (paymentIntentId == null) {
             throw new MsgException("Payment expired! Try again!");
@@ -81,11 +87,12 @@ public class CustomerBookingService {
         if (!draft.isPaid()) {
             throw new MsgException("Please complete payment first");
         }
+        // Validate requested details against the paid draft
         if (!safeTrim(request.getSpecialistId()).equals(safeTrim(draft.getSpecialistId()))
                 || !safeTrim(request.getSlotId()).equals(safeTrim(draft.getSlotId()))) {
             throw new MsgException("Invalid Payment Info");
         }
-
+        // Persist booking and update slot availability
         Slot slot = slotRepository.getById(request.getSlotId());
         if (!slot.getAvailable()){
             throw new MsgException("Please choose a valid slot");
@@ -104,14 +111,19 @@ public class CustomerBookingService {
 
         return new CreateBookingResult(booking.getId(), booking.getSpecialistId(), booking.getSlotId(), booking.getStatus());
     }
-
+    /**
+     * Initializes a payment intent and generates an Alipay QR code.
+     * Uses Redis to store a 'PaymentDraft' to prevent double-booking during the 15-minute payment window.
+     */
     public CreateBookingPaymentResult createBookingPayment(String userId, String paymentIntentId, CreateBookingPaymentRequest request) {
+        // Prevent duplicate unpaid orders for the same slot
         List<UnpaidPaymentItemResult> items = listUnpaidPayments(userId).getItems();
         for (UnpaidPaymentItemResult result : items){
             if (result.getSlotId().equals(request.getSlotId())){
                 throw new MsgException("You have an untreated order for the same time period.");
             }
         }
+        // Validate Slot and Specialist
         String specialistId = safeTrim(request == null ? null : request.getSpecialistId());
         String slotId = safeTrim(request == null ? null : request.getSlotId());
         if (specialistId.isBlank() || slotId.isBlank()) {
@@ -129,7 +141,7 @@ public class CustomerBookingService {
         if (normalizedIntentId.isBlank()) {
             throw new MsgException("Payment intent id cannot be empty");
         }
-
+        // Prepare Alipay transaction
         double amount = resolvePaymentAmount(request, slot);
         String currency = resolveCurrency(request, slot);
         String normalizedAmount = String.format(Locale.US, "%.2f", amount);
@@ -154,7 +166,10 @@ public class CustomerBookingService {
         log.info("create outTradeNo: {}", paymentToken);
         return new CreateBookingPaymentResult(paymentToken, paymentToken, qrCodeUrl, amount, currency);
     }
-
+    /**
+     * Synchronizes payment status with Alipay.
+     * Checks if the transaction is successful and updates the local Redis draft.
+     */
     public ConfirmBookingPaymentResult confirmBookingPayment(String userId, String paymentIntentId, ConfirmBookingPaymentRequest request) {
         PaymentDraft draft = (PaymentDraft) redisTemplate.opsForValue()
                 .get(PAYMENT_DRAFT_KEY + paymentIntentId);
@@ -174,12 +189,12 @@ public class CustomerBookingService {
         }
 
         log.info("query outTradeNo: {}", draft.getOutTradeNo());
-
+        // Query Alipay gateway for actual transaction status
         String tradeStatus = alipayGatewayService.queryTradeStatus(draft.getOutTradeNo());
         if (!isAlipaySuccess(tradeStatus)) {
             throw new MsgException("支付未完成，当前状态: " + safeTrim(tradeStatus));
         }
-
+        // Update local state to Paid
         draft.setPaid(true);
         redisTemplate.opsForValue().set(
                 PAYMENT_DRAFT_KEY + paymentIntentId,
@@ -189,7 +204,9 @@ public class CustomerBookingService {
         redisTemplate.opsForZSet().remove(userUnpaidKey(userId), paymentIntentId);
         return new ConfirmBookingPaymentResult(paymentIntentId, draft.getPaymentId(), "SUCCESS", BookingStatus.Pending);
     }
-
+    /**
+     * For development/testing: bypasses Alipay to mark a draft as paid.
+     */
     public ConfirmBookingPaymentResult mockSuccessPayment(String userId, String paymentIntentId) {
         if (!mockPaymentEnabled) {
             throw new MsgException("Mock支付未开启");
@@ -212,7 +229,10 @@ public class CustomerBookingService {
         }
         return new ConfirmBookingPaymentResult(normalizedIntentId, draft.getPaymentId(), "SUCCESS", BookingStatus.Pending);
     }
-
+    /**
+     * Processes asynchronous callback notifications from Alipay.
+     * Marks the corresponding PaymentDraft as paid in Redis.
+     */
     public boolean handleAlipayNotify(Map<String, String> notifyParams) {
         if (notifyParams == null || notifyParams.isEmpty()) {
             return false;
@@ -245,7 +265,9 @@ public class CustomerBookingService {
         }
         return true;
     }
-
+    /**
+     * Lists all active (unexpired and unpaid) payment intents for a user.
+     */
     public UnpaidPaymentsResult listUnpaidPayments(String userId) {
         Set<Object> intentSet = redisTemplate.opsForZSet().range(userUnpaidKey(userId), 0, -1);
         List<UnpaidPaymentItemResult> items = new ArrayList<>();
@@ -261,6 +283,7 @@ public class CustomerBookingService {
                 items.add(item);
             }
         }
+        // Sort by longest remaining time first
         items.sort((a, b) -> Long.compare(b.getRemainingSeconds() == null ? 0 : b.getRemainingSeconds(),
                 a.getRemainingSeconds() == null ? 0 : a.getRemainingSeconds()));
         return new UnpaidPaymentsResult(items);
@@ -269,7 +292,10 @@ public class CustomerBookingService {
     public UnpaidPaymentItemResult getUnpaidPayment(String userId, String paymentIntentId) {
         return loadUnpaidItem(userId, paymentIntentId, Instant.now().toEpochMilli(), false);
     }
-
+    /**
+     * Regenerates an Alipay QR code for an existing unpaid draft.
+     * Useful if the user closed the payment page but wants to try again within the 15-min window.
+     */
     public CreateBookingPaymentResult resumeUnpaidPayment(String userId, String paymentIntentId) {
         String normalizedIntentId = safeTrim(paymentIntentId);
         if (normalizedIntentId.isBlank()) {
@@ -287,6 +313,7 @@ public class CustomerBookingService {
             redisTemplate.opsForZSet().remove(userUnpaidKey(userId), normalizedIntentId);
             throw new MsgException("This payment order has been paid.");
         }
+        // Re-validate slot availability before allowing resume
         Slot slot = slotRepository.findById(draft.getSlotId())
                 .orElseThrow(() -> new MsgException("The appointment time slot does not exist"));
         if (!Boolean.TRUE.equals(slot.getAvailable())) {
@@ -297,7 +324,7 @@ public class CustomerBookingService {
             cleanupIntent(draft.getCustomerId(), normalizedIntentId, draft.getPaymentId());
             throw new MsgException("The specialist does not match the time slot.");
         }
-
+        // Generate new Alipay out_trade_no for the same intent
         String newPaymentToken = buildPaymentToken(normalizedIntentId);
         String normalizedAmount = String.format(Locale.US, "%.2f", draft.getAmount() == null ? 0 : draft.getAmount());
         String subject = "Booking " + normalizedIntentId;
@@ -338,7 +365,9 @@ public class CustomerBookingService {
         }
         cleanupIntent(userId, normalizedIntentId, draft.getPaymentId());
     }
-
+    /**
+     * Fetches a paginated list of bookings owned by the current user, with optional status and date filters.
+     */
     public BookingPageResult getMyBookings(String userId, String status, Integer page, Integer pageSize, String from, String to) {
         int safePage = page == null || page < 1 ? 1 : page;
         int safePageSize = pageSize == null || pageSize < 1 ? 10 : pageSize;
@@ -405,7 +434,13 @@ public class CustomerBookingService {
             throw new MsgException("Incorrect date format：" + value);
         }
     }
-
+    /**
+     * Retrieves comprehensive information for a specific booking.
+     * Aggregates data from Booking, Slot, and User (Specialist/Customer) entities.
+     *
+     * @param bookingId The unique identifier of the booking.
+     * @return A Value Object (VO) containing enriched booking details for the UI.
+     */
     public SingleBookingVo getSingleBookingInfo(String bookingId){
         Booking booking = bookingRepository.getBookingById(bookingId);
         Slot slot = slotRepository.getSlotById(booking.getSlotId());
@@ -414,12 +449,25 @@ public class CustomerBookingService {
         String customerName = setNameInfo(booking.getCustomerId());
         return SingleBookingVo.fromBooking(booking, slot, specialistName ,customerName);
     }
-
+    /**
+     * Helper method to retrieve a user's name by their ID.
+     *
+     * @param userId The ID of the user to look up.
+     * @return The user's name string.
+     */
     public String setNameInfo(String userId){
         User user = userRepository.getUserById(userId);
         return user.getName();
     }
-
+    /**
+     * Validates ownership of a booking.
+     * Fetches the booking and ensures it belongs to the requesting user to prevent unauthorized access.
+     *
+     * @param userId    The ID of the user attempting the operation.
+     * @param bookingId The ID of the booking to retrieve.
+     * @return The Booking entity if authorized.
+     * @throws MsgException if the booking is not found or user lacks permission.
+     */
     private Booking getOwnedBooking(String userId, String bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new MsgException("预约不存在"));
@@ -428,7 +476,14 @@ public class CustomerBookingService {
         }
         return booking;
     }
-
+    /**
+     * Resolves the final payment amount for a transaction.
+     * Prioritizes the amount specified in the request, falling back to the default slot price.
+     *
+     * @param request The payment request containing a potential custom amount.
+     * @param slot    The time slot containing the default price.
+     * @return The validated payment amount as a double.
+     */
     private double resolvePaymentAmount(CreateBookingPaymentRequest request, Slot slot) {
         double fallback = slot.getAmount() == null ? 0.0 : slot.getAmount().doubleValue();
         if (request == null || request.getAmount() == null) {
@@ -436,7 +491,14 @@ public class CustomerBookingService {
         }
         return request.getAmount() < 0 ? fallback : request.getAmount();
     }
-
+    /**
+     * Determines the currency for the transaction.
+     * Priority: 1. Slot configuration -> 2. Request parameter -> 3. Default (CNY).
+     *
+     * @param request The payment request containing potential currency info.
+     * @param slot    The time slot containing default currency info.
+     * @return A trimmed currency string (e.g., "USD", "CNY").
+     */
     private String resolveCurrency(CreateBookingPaymentRequest request, Slot slot) {
         String fromSlot = safeTrim(slot.getCurrency());
         if (!fromSlot.isBlank()) {
@@ -464,7 +526,20 @@ public class CustomerBookingService {
         }
         redisTemplate.opsForZSet().remove(userUnpaidKey(userId), intentId);
     }
-
+    /**
+     * Loads a single unpaid payment item from Redis and calculates its remaining TTL (Time To Live).
+     * This method performs several integrity checks:
+     * 1. Existence: Removes orphaned IDs from the ZSet if the draft has expired.
+     * 2. Ownership: Ensures the requesting user owns the payment draft.
+     * 3. Status: Filters out already-paid drafts.
+     * 4. Expiration: Cleans up the intent if the remaining time has reached zero.
+     *
+     * @param userId          The ID of the user requesting the item.
+     * @param paymentIntentId The unique identifier for the payment session.
+     * @param nowMs           The current system time in milliseconds.
+     * @param silent          If true, returns null on permission failure instead of throwing an exception.
+     * @return An UnpaidPaymentItemResult populated with slot details and TTL, or null if invalid.
+     */
     private UnpaidPaymentItemResult loadUnpaidItem(String userId, String paymentIntentId, long nowMs, boolean silent) {
         String intentId = safeTrim(paymentIntentId);
         if (intentId.isBlank()) return null;
@@ -508,11 +583,23 @@ public class CustomerBookingService {
                 remainSec
         );
     }
-
+    /**
+     * Checks if the status string returned by Alipay indicates a successful transaction.
+     *
+     * @param status The trade status string from Alipay.
+     * @return true if the trade is finished or successfully paid.
+     */
     private boolean isAlipaySuccess(String status) {
         return "TRADE_SUCCESS".equalsIgnoreCase(status) || "TRADE_FINISHED".equalsIgnoreCase(status);
     }
-
+    /**
+     * Generates a unique "out_trade_no" for Alipay transactions.
+     * Combines a prefix, current timestamp, and a sanitized version of the booking ID
+     * to ensure uniqueness across multiple payment attempts for the same booking.
+     *
+     * @param bookingId The internal booking ID or payment intent ID.
+     * @return A unique payment token string.
+     */
     private String buildPaymentToken(String bookingId) {
         long now = System.currentTimeMillis();
         String compactId = bookingId == null ? "booking" : bookingId.replace("-", "");
@@ -521,7 +608,9 @@ public class CustomerBookingService {
         }
         return "BK" + now + compactId;
     }
-
+    /**
+     * Cancels an existing booking and releases the associated slot back to the public pool.
+     */
     @Transactional
     public BookingActionResult cancelBooking(String id) {
         // get booking details by id
@@ -539,7 +628,11 @@ public class CustomerBookingService {
 
         return new BookingActionResult(id, BookingStatus.Cancelled);
     }
-
+    /**
+     * Reschedules an existing booking to a new time slot.
+     * Releases the old slot and locks the new one in a single transaction.
+     * Sends email notifications to both the customer and the specialist.
+     */
     @Transactional
     public void rescheduleBooking(String bookingId, String newSlotId) {
         // get booking details

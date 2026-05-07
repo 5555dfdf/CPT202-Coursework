@@ -48,6 +48,14 @@ public class AuthService {
         storeToken(result.getToken(), result.getUser().getId());
     }
 
+    /**
+     * Persists the authentication token in Redis with a 1-day expiration.
+     * Implements "Single Device Login" logic by invalidating any existing tokens for the user.
+     *
+     * Mapping strategy:
+     * 1. auth:token:{token} -> {userId} (Used for authentication)
+     * 2. auth:user:{userId} -> {token}  (Used to track/kick existing sessions)
+     */
     public void storeToken(String token, String userId) {
 
         String tokenKey = "auth:token:" + token;
@@ -95,7 +103,10 @@ public class AuthService {
         return userRepository.findById(userId);
 
     }
-
+    /**
+     * Standard email/password login.
+     * Includes a specific check for Specialist accounts to ensure they are not 'Inactive'.
+     */
     public User login(String email, String password) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new MsgException("User does not exist"));
@@ -113,7 +124,7 @@ public class AuthService {
         }
         return user;
     }
-
+    /** Authenticates a user via a 6-digit verification code (captcha) stored in Redis. */
     public User loginByCode(String email, String code){
         String cachedCode = redisTemplate.opsForValue().get("captcha:" + email);
         if (cachedCode == null || !cachedCode.equals(code)) {
@@ -122,21 +133,24 @@ public class AuthService {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new MsgException("This email is not registered."));
     }
-
+    /**
+     * Registers a new Customer.
+     * Validates the verification code and ensures the email is unique before persisting.
+     */
     public User register(String name,String email, String code, String password) {
-        // 校验验证码
+        // Verify captcha
         try {
             String cachedCode = redisTemplate.opsForValue().get("captcha:" + email);
             if (cachedCode == null || !cachedCode.equals(code)) {
                 throw new MsgException("Verification code is incorrect or expired");
             }
 
-            // 检查用户是否已存在
+            // Check for existing account
             if (userRepository.findByEmail(email).isPresent()) {
                 throw new MsgException("This email is already registered.");
             }
 
-            // 创建新用户
+            // Create new user entity with encoded password
             User user = new User();
             user.setName(name);
             user.setEmail(email);
@@ -146,14 +160,14 @@ public class AuthService {
 
             userRepository.save(user);
 
-            // 注册成功后删除验证码
+            // Cleanup: Remove the captcha from Redis upon successful registration
             redisTemplate.delete("captcha:" + email);
             return user;
         } catch (RuntimeException e) {
             throw new RuntimeException(e);
         }
     }
-
+    /** Retrieves the Role associated with a specific User ID. */
     public Role getRoleByUserId(String userId) {
         User user = userRepository.findById(userId);
         return user.getRole();
