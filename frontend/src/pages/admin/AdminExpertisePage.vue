@@ -1,278 +1,293 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { api } from '@/api/client'
-import { showAlertModal } from '@/ui/alertModal'
+import { computed, onMounted, ref, watch } from "vue";
+import { api } from "@/api/client";
+import { showAlertModal } from "@/ui/alertModal";
 
-const items = ref([])
-const loading = ref(false)
-const error = ref('')
-const success = ref('')
-const searchQuery = ref('')
+const items = ref([]);
+const loading = ref(false);
+const error = ref("");
+const success = ref("");
+const searchQuery = ref("");
 
-const createName = ref('')
-const createDesc = ref('')
-const creating = ref(false)
-const nameFocused = ref(false)
-const descFocused = ref(false)
-const nameLimitError = ref('')
-const descLimitError = ref('')
+const createName = ref("");
+const createDesc = ref("");
+const creating = ref(false);
+const nameFocused = ref(false);
+const descFocused = ref(false);
+const nameLimitError = ref("");
+const descLimitError = ref("");
 
-const editOpen = ref(false)
-const editId = ref('')
-const editName = ref('')
-const editDesc = ref('')
-const updating = ref(false)
-const deletingId = ref('')
-const editNameFocused = ref(false)
-const editDescFocused = ref(false)
-const editNameLimitError = ref('')
-const editDescLimitError = ref('')
+const editOpen = ref(false);
+const editId = ref("");
+const editName = ref("");
+const editDesc = ref("");
+const updating = ref(false);
+const deletingId = ref("");
+const editNameFocused = ref(false);
+const editDescFocused = ref(false);
+const editNameLimitError = ref("");
+const editDescLimitError = ref("");
 
-const NAME_MAX = 50
-const DESC_MAX = 300
+const NAME_MAX = 50;
+const DESC_MAX = 300;
 
-const showNameHelper = computed(() => nameFocused.value || !!nameLimitError.value)
-const showDescHelper = computed(() => descFocused.value || !!descLimitError.value)
-const showEditNameHelper = computed(() => editNameFocused.value || !!editNameLimitError.value)
-const showEditDescHelper = computed(() => editDescFocused.value || !!editDescLimitError.value)
+const showNameHelper = computed(
+  () => nameFocused.value || !!nameLimitError.value,
+);
+const showDescHelper = computed(
+  () => descFocused.value || !!descLimitError.value,
+);
+const showEditNameHelper = computed(
+  () => editNameFocused.value || !!editNameLimitError.value,
+);
+const showEditDescHelper = computed(
+  () => editDescFocused.value || !!editDescLimitError.value,
+);
 
 const filteredItems = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return items.value
-  return items.value.filter((row) => String(row?.name ?? '').toLowerCase().includes(q))
-})
+  const q = searchQuery.value.trim().toLowerCase();
+  if (!q) return items.value;
+  return items.value.filter((row) =>
+    String(row?.name ?? "")
+      .toLowerCase()
+      .includes(q),
+  );
+});
 const expertiseCountLabel = computed(() => {
-  const count = items.value.length
-  return `${count} expertise item${count === 1 ? '' : 's'}`
-})
+  const count = items.value.length;
+  return `${count} expertise item${count === 1 ? "" : "s"}`;
+});
 
 function rowId(row) {
-  return row?.id != null ? String(row.id) : ''
+  return row?.id != null ? String(row.id) : "";
 }
 
 function rowDesc(row) {
-  const v = row?.description ?? row?.desc ?? ''
-  return typeof v === 'string' ? v : ''
+  const v = row?.description ?? row?.desc ?? "";
+  return typeof v === "string" ? v : "";
 }
 
 function onNameFocus() {
-  nameFocused.value = true
+  nameFocused.value = true;
 }
 
 function onNameBlur() {
-  nameFocused.value = false
+  nameFocused.value = false;
   if (createName.value.length <= NAME_MAX) {
-    nameLimitError.value = ''
+    nameLimitError.value = "";
   }
 }
 
 function onDescFocus() {
-  descFocused.value = true
+  descFocused.value = true;
 }
 
 function onDescBlur() {
-  descFocused.value = false
+  descFocused.value = false;
   if (createDesc.value.length <= DESC_MAX) {
-    descLimitError.value = ''
+    descLimitError.value = "";
   }
 }
 
 function onEditNameFocus() {
-  editNameFocused.value = true
+  editNameFocused.value = true;
 }
 
 function onEditNameBlur() {
-  editNameFocused.value = false
+  editNameFocused.value = false;
   if (editName.value.length <= NAME_MAX) {
-    editNameLimitError.value = ''
+    editNameLimitError.value = "";
   }
 }
 
 function onEditDescFocus() {
-  editDescFocused.value = true
+  editDescFocused.value = true;
 }
 
 function onEditDescBlur() {
-  editDescFocused.value = false
+  editDescFocused.value = false;
   if (editDesc.value.length <= DESC_MAX) {
-    editDescLimitError.value = ''
+    editDescLimitError.value = "";
   }
 }
-
 watch(createName, (val) => {
   if (val.length > NAME_MAX) {
-    createName.value = val.slice(0, NAME_MAX)
-    nameLimitError.value = `Maximum ${NAME_MAX} characters allowed.`
-    return
+    createName.value = val.slice(0, NAME_MAX);
+    nameLimitError.value = `Maximum ${NAME_MAX} characters allowed.`;
+    return;
   }
   if (val.length < NAME_MAX) {
-    nameLimitError.value = ''
+    nameLimitError.value = "";
   }
-})
-
+});
 watch(createDesc, (val) => {
   if (val.length > DESC_MAX) {
-    createDesc.value = val.slice(0, DESC_MAX)
-    descLimitError.value = `Maximum ${DESC_MAX} characters allowed.`
-    return
+    createDesc.value = val.slice(0, DESC_MAX);
+    descLimitError.value = `Maximum ${DESC_MAX} characters allowed.`;
+    return;
   }
   if (val.length < DESC_MAX) {
-    descLimitError.value = ''
+    descLimitError.value = "";
   }
-})
+});
 
 watch(editName, (val) => {
   if (val.length > NAME_MAX) {
-    editName.value = val.slice(0, NAME_MAX)
-    editNameLimitError.value = `Maximum ${NAME_MAX} characters allowed.`
-    return
+    editName.value = val.slice(0, NAME_MAX);
+    editNameLimitError.value = `Maximum ${NAME_MAX} characters allowed.`;
+    return;
   }
   if (val.length < NAME_MAX) {
-    editNameLimitError.value = ''
+    editNameLimitError.value = "";
   }
-})
+});
 
 watch(editDesc, (val) => {
   if (val.length > DESC_MAX) {
-    editDesc.value = val.slice(0, DESC_MAX)
-    editDescLimitError.value = `Maximum ${DESC_MAX} characters allowed.`
-    return
+    editDesc.value = val.slice(0, DESC_MAX);
+    editDescLimitError.value = `Maximum ${DESC_MAX} characters allowed.`;
+    return;
   }
   if (val.length < DESC_MAX) {
-    editDescLimitError.value = ''
+    editDescLimitError.value = "";
   }
-})
-
+});
 async function load() {
-  error.value = ''
-  loading.value = true
+  error.value = "";
+  loading.value = true;
   try {
-    items.value = await api.listExpertise()
+    items.value = await api.listExpertise();
   } catch (e) {
-    error.value = e?.message || 'Failed to load'
-    items.value = []
-    showAlertModal({ type: 'error', message: error.value })
+    error.value = e?.message || "Failed to load";
+    items.value = [];
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 async function onCreate() {
   if (!createName.value.trim()) {
-    error.value = 'Please enter an expertise name'
-    showAlertModal({ type: 'error', message: error.value })
-    return
+    error.value = "Please enter an expertise name";
+    showAlertModal({ type: "error", message: error.value });
+    return;
   }
-  creating.value = true
-  error.value = ''
-  success.value = ''
+  creating.value = true;
+  error.value = "";
+  success.value = "";
   try {
     await api.adminCreateExpertise({
       name: createName.value.trim(),
-      description: createDesc.value.trim() || undefined
-    })
-    createName.value = ''
-    createDesc.value = ''
-    await load()
-    success.value = 'Expertise created successfully.'
-    showAlertModal({ type: 'success', message: success.value })
+      description: createDesc.value.trim() || undefined,
+    });
+    createName.value = "";
+    createDesc.value = "";
+    await load();
+    success.value = "Expertise created successfully.";
+    showAlertModal({ type: "success", message: success.value });
   } catch (e) {
-    error.value = e?.message || 'Failed to create'
-    showAlertModal({ type: 'error', message: error.value })
+    error.value = e?.message || "Failed to create";
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    creating.value = false
+    creating.value = false;
   }
 }
 
 function openEdit(row) {
-  const id = rowId(row)
+  const id = rowId(row);
   if (!id) {
-    error.value = 'This expertise record has no ID and cannot be edited.'
-    showAlertModal({ type: 'error', message: error.value })
-    return
+    error.value = "This expertise record has no ID and cannot be edited.";
+    showAlertModal({ type: "error", message: error.value });
+    return;
   }
-  error.value = ''
-  success.value = ''
-  editId.value = id
-  editName.value = String(row?.name ?? '')
-  editDesc.value = rowDesc(row)
-  editNameFocused.value = false
-  editDescFocused.value = false
-  editNameLimitError.value = ''
-  editDescLimitError.value = ''
-  editOpen.value = true
+  error.value = "";
+  success.value = "";
+  editId.value = id;
+  editName.value = String(row?.name ?? "");
+  editDesc.value = rowDesc(row);
+  editNameFocused.value = false;
+  editDescFocused.value = false;
+  editNameLimitError.value = "";
+  editDescLimitError.value = "";
+  editOpen.value = true;
 }
 
 function closeEdit(force = false) {
-  if (updating.value && !force) return
-  editOpen.value = false
-  editId.value = ''
-  editName.value = ''
-  editDesc.value = ''
-  editNameFocused.value = false
-  editDescFocused.value = false
-  editNameLimitError.value = ''
-  editDescLimitError.value = ''
+  if (updating.value && !force) return;
+  editOpen.value = false;
+  editId.value = "";
+  editName.value = "";
+  editDesc.value = "";
+  editNameFocused.value = false;
+  editDescFocused.value = false;
+  editNameLimitError.value = "";
+  editDescLimitError.value = "";
 }
 
 async function onUpdate() {
   if (!editId.value) {
-    error.value = 'Missing expertise ID'
-    showAlertModal({ type: 'error', message: error.value })
-    return
+    error.value = "Missing expertise ID";
+    showAlertModal({ type: "error", message: error.value });
+    return;
   }
   if (!editName.value.trim()) {
-    error.value = 'Please enter an expertise name'
-    showAlertModal({ type: 'error', message: error.value })
-    return
+    error.value = "Please enter an expertise name";
+    showAlertModal({ type: "error", message: error.value });
+    return;
   }
-  updating.value = true
-  error.value = ''
-  success.value = ''
+  updating.value = true;
+  error.value = "";
+  success.value = "";
   try {
     await api.adminUpdateExpertise(editId.value, {
       name: editName.value.trim(),
-      description: editDesc.value.trim() || undefined
-    })
-    await load()
-    success.value = 'Expertise updated successfully.'
-    showAlertModal({ type: 'success', message: success.value, onClose: () => closeEdit(true) })
+      description: editDesc.value.trim() || undefined,
+    });
+    await load();
+    success.value = "Expertise updated successfully.";
+    showAlertModal({
+      type: "success",
+      message: success.value,
+      onClose: () => closeEdit(true),
+    });
   } catch (e) {
-    error.value = e?.message || 'Failed to update'
-    showAlertModal({ type: 'error', message: error.value })
+    error.value = e?.message || "Failed to update";
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    updating.value = false
+    updating.value = false;
   }
 }
 
 async function onDelete(row) {
-  const id = rowId(row)
+  const id = rowId(row);
   if (!id) {
-    error.value = 'This expertise record has no ID and cannot be deleted.'
-    showAlertModal({ type: 'error', message: error.value })
-    return
+    error.value = "This expertise record has no ID and cannot be deleted.";
+    showAlertModal({ type: "error", message: error.value });
+    return;
   }
-  const name = String(row?.name ?? id)
-  const ok = window.confirm(`Delete expertise "${name}"? This action cannot be undone.`)
-  if (!ok) return
+  const name = String(row?.name ?? id);
+  const ok = window.confirm(
+    `Delete expertise "${name}"? This action cannot be undone.`,
+  );
+  if (!ok) return;
 
-  deletingId.value = id
-  error.value = ''
-  success.value = ''
+  deletingId.value = id;
+  error.value = "";
+  success.value = "";
   try {
-    await api.adminDeleteExpertise(id)
-    await load()
-    success.value = 'Expertise deleted successfully.'
-    showAlertModal({ type: 'success', message: success.value })
+    await api.adminDeleteExpertise(id);
+    await load();
+    success.value = "Expertise deleted successfully.";
+    showAlertModal({ type: "success", message: success.value });
   } catch (e) {
-    error.value = e?.message || 'Failed to delete'
-    showAlertModal({ type: 'error', message: error.value })
+    error.value = e?.message || "Failed to delete";
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    deletingId.value = ''
+    deletingId.value = "";
   }
 }
 
-onMounted(load)
+onMounted(load);
 </script>
 
 <template>
@@ -280,7 +295,8 @@ onMounted(load)
     <header class="page__header">
       <h1>Expertise Management</h1>
       <p class="subtitle">
-        Manage expertise categories used for specialist classification and booking.
+        Manage expertise categories used for specialist classification and
+        booking.
       </p>
     </header>
 
@@ -305,8 +321,12 @@ onMounted(load)
           role="status"
           aria-live="polite"
         >
-          <p class="limit-helper__text">{{ nameLimitError || `Maximum ${NAME_MAX} characters` }}</p>
-          <p class="limit-helper__count">{{ createName.length }}/{{ NAME_MAX }}</p>
+          <p class="limit-helper__text">
+            {{ nameLimitError || `Maximum ${NAME_MAX} characters` }}
+          </p>
+          <p class="limit-helper__count">
+            {{ createName.length }}/{{ NAME_MAX }}
+          </p>
         </div>
 
         <textarea
@@ -326,12 +346,21 @@ onMounted(load)
           role="status"
           aria-live="polite"
         >
-          <p class="limit-helper__text">{{ descLimitError || `Maximum ${DESC_MAX} characters` }}</p>
-          <p class="limit-helper__count">{{ createDesc.length }}/{{ DESC_MAX }}</p>
+          <p class="limit-helper__text">
+            {{ descLimitError || `Maximum ${DESC_MAX} characters` }}
+          </p>
+          <p class="limit-helper__count">
+            {{ createDesc.length }}/{{ DESC_MAX }}
+          </p>
         </div>
 
-        <button type="button" class="btn-primary btn-primary--fit" :disabled="creating" @click="onCreate">
-          {{ creating ? 'Creating...' : 'Create' }}
+        <button
+          type="button"
+          class="btn-primary btn-primary--fit"
+          :disabled="creating"
+          @click="onCreate"
+        >
+          {{ creating ? "Creating..." : "Create" }}
         </button>
       </div>
     </section>
@@ -353,8 +382,13 @@ onMounted(load)
             placeholder="Search expertise by name"
             aria-label="Search expertise by name"
           />
-          <button type="button" class="btn-neutral btn-refresh" :disabled="loading" @click="load">
-            {{ loading ? 'Loading...' : 'Refresh' }}
+          <button
+            type="button"
+            class="btn-neutral btn-refresh"
+            :disabled="loading"
+            @click="load"
+          >
+            {{ loading ? "Loading..." : "Refresh" }}
           </button>
         </div>
       </div>
@@ -366,7 +400,11 @@ onMounted(load)
       <div v-if="loading && !items.length" class="state muted">Loading...</div>
 
       <div v-else-if="!filteredItems.length" class="state muted">
-        {{ searchQuery ? 'No expertise matched your search.' : 'No expertise data.' }}
+        {{
+          searchQuery
+            ? "No expertise matched your search."
+            : "No expertise data."
+        }}
       </div>
 
       <div v-else class="table-wrap">
@@ -381,15 +419,17 @@ onMounted(load)
           </thead>
           <tbody>
             <tr v-for="row in filteredItems" :key="row.id ?? row.name">
-              <td class="mono weak">{{ rowId(row) || '—' }}</td>
-              <td class="name-cell">{{ row.name ?? '—' }}</td>
-              <td class="desc-cell">{{ rowDesc(row) || '—' }}</td>
+              <td class="mono weak">{{ rowId(row) || "—" }}</td>
+              <td class="name-cell">{{ row.name ?? "—" }}</td>
+              <td class="desc-cell">{{ rowDesc(row) || "—" }}</td>
               <td>
                 <div class="row-actions">
                   <button
                     type="button"
                     class="action-btn"
-                    :disabled="!rowId(row) || updating || deletingId === rowId(row)"
+                    :disabled="
+                      !rowId(row) || updating || deletingId === rowId(row)
+                    "
                     @click="openEdit(row)"
                   >
                     Edit
@@ -397,10 +437,12 @@ onMounted(load)
                   <button
                     type="button"
                     class="action-btn action-btn--danger"
-                    :disabled="!rowId(row) || updating || deletingId === rowId(row)"
+                    :disabled="
+                      !rowId(row) || updating || deletingId === rowId(row)
+                    "
                     @click="onDelete(row)"
                   >
-                    {{ deletingId === rowId(row) ? 'Deleting...' : 'Delete' }}
+                    {{ deletingId === rowId(row) ? "Deleting..." : "Delete" }}
                   </button>
                 </div>
               </td>
@@ -419,7 +461,7 @@ onMounted(load)
         <div class="detail-list">
           <div class="detail-row">
             <span class="detail-key">Expertise ID</span>
-            <span class="detail-value mono">{{ editId || '--' }}</span>
+            <span class="detail-value mono">{{ editId || "--" }}</span>
           </div>
         </div>
 
@@ -442,8 +484,12 @@ onMounted(load)
             role="status"
             aria-live="polite"
           >
-            <p class="limit-helper__text">{{ editNameLimitError || `Maximum ${NAME_MAX} characters` }}</p>
-            <p class="limit-helper__count">{{ editName.length }}/{{ NAME_MAX }}</p>
+            <p class="limit-helper__text">
+              {{ editNameLimitError || `Maximum ${NAME_MAX} characters` }}
+            </p>
+            <p class="limit-helper__count">
+              {{ editName.length }}/{{ NAME_MAX }}
+            </p>
           </div>
 
           <textarea
@@ -463,13 +509,22 @@ onMounted(load)
             role="status"
             aria-live="polite"
           >
-            <p class="limit-helper__text">{{ editDescLimitError || `Maximum ${DESC_MAX} characters` }}</p>
-            <p class="limit-helper__count">{{ editDesc.length }}/{{ DESC_MAX }}</p>
+            <p class="limit-helper__text">
+              {{ editDescLimitError || `Maximum ${DESC_MAX} characters` }}
+            </p>
+            <p class="limit-helper__count">
+              {{ editDesc.length }}/{{ DESC_MAX }}
+            </p>
           </div>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn-neutral modal-cancel" :disabled="updating" @click="closeEdit">
+          <button
+            type="button"
+            class="btn-neutral modal-cancel"
+            :disabled="updating"
+            @click="closeEdit"
+          >
             Cancel
           </button>
           <button
@@ -478,7 +533,7 @@ onMounted(load)
             :disabled="updating"
             @click="onUpdate"
           >
-            {{ updating ? 'Saving...' : 'Save Changes' }}
+            {{ updating ? "Saving..." : "Save Changes" }}
           </button>
         </div>
       </section>

@@ -1,91 +1,92 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { api } from '@/api/client'
-import { showAlertModal } from '@/ui/alertModal'
+import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { api } from "@/api/client";
+import { showAlertModal } from "@/ui/alertModal";
 
-const router = useRouter()
+const router = useRouter();
 
-const slots = ref([])
-const loading = ref(false)
-const error = ref('')
-const success = ref('')
-const deletingId = ref('')
-const editOpen = ref(false)
-const editLoading = ref(false)
-const editSaving = ref(false)
-const editingSlotId = ref('')
-const pricingRules = ref([])
-const pricingRulesLoading = ref(false)
-const pricingRulesError = ref('')
-const DETAIL_MAX = 300
+const slots = ref([]);
+const loading = ref(false);
+const error = ref("");
+const success = ref("");
+const deletingId = ref("");
+const editOpen = ref(false);
+const editLoading = ref(false);
+const editSaving = ref(false);
+const editingSlotId = ref("");
+const pricingRules = ref([]);
+const pricingRulesLoading = ref(false);
+const pricingRulesError = ref("");
+const DETAIL_MAX = 300;
 
 const editForm = ref({
-  date: '',
-  start: '',
-  end: '',
+  date: "",
+  start: "",
+  end: "",
   available: true,
-  amount: '0.00',
-  currency: 'CNY',
-  type: 'online',
-  detail: ''
-})
-
+  amount: "0.00",
+  currency: "CNY",
+  type: "online",
+  detail: "",
+});
 const formattedSlots = computed(() => {
-  return slots.value.map(slot => ({
+  return slots.value.map((slot) => ({
     ...slot,
     formattedDate: formatDate(slot.date),
     formattedDuration: formatDuration(slot.duration),
     formattedAmount: formatCurrency(slot.amount, slot.currency),
-    formattedType: formatType(slot.type)
-  }))
-})
+    formattedType: formatType(slot.type),
+  }));
+});
 
-const pricingRulesPreview = computed(() => pricingRules.value.slice(0, 4))
-const extraPricingRulesCount = computed(() => Math.max(0, pricingRules.value.length - pricingRulesPreview.value.length))
+const pricingRulesPreview = computed(() => pricingRules.value.slice(0, 4));
+const extraPricingRulesCount = computed(() =>
+  Math.max(0, pricingRules.value.length - pricingRulesPreview.value.length),
+);
 
 function formatDate(dateStr) {
-  if (!dateStr) return '--'
+  if (!dateStr) return "--";
   try {
-    return new Date(dateStr).toLocaleDateString('zh-CN')
+    return new Date(dateStr).toLocaleDateString("zh-CN");
   } catch {
-    return dateStr
+    return dateStr;
   }
 }
 
 function formatDuration(minutes) {
-  const mins = Number(minutes)
-  return mins > 0 ? `${mins} min` : '--'
+  const mins = Number(minutes);
+  return mins > 0 ? `${mins} min` : "--";
 }
 
-function formatCurrency(amount, currency = 'CNY') {
-  const num = Number(amount)
-  if (!Number.isFinite(num)) return '--'
-  return `${num.toFixed(2)} ${currency}`
+function formatCurrency(amount, currency = "CNY") {
+  const num = Number(amount);
+  if (!Number.isFinite(num)) return "--";
+  return `${num.toFixed(2)} ${currency}`;
 }
 
 function formatType(type) {
-  return String(type || '--')
+  return String(type || "--");
 }
 
 function calcDurationMinutes(startStr, endStr) {
-  if (!startStr || !endStr) return 0
-  const [startHour, startMin] = String(startStr).split(':').map(Number)
-  const [endHour, endMin] = String(endStr).split(':').map(Number)
-  const startTotal = startHour * 60 + startMin
-  const endTotal = endHour * 60 + endMin
-  return Math.max(0, endTotal - startTotal)
+  if (!startStr || !endStr) return 0;
+  const [startHour, startMin] = String(startStr).split(":").map(Number);
+  const [endHour, endMin] = String(endStr).split(":").map(Number);
+  const startTotal = startHour * 60 + startMin;
+  const endTotal = endHour * 60 + endMin;
+  return Math.max(0, endTotal - startTotal);
 }
 
 function normalizeAmountInput(value) {
-  if (value === null || value === undefined || value === '') return 0
-  const num = Number(value)
-  return Number.isNaN(num) ? 0 : num
+  if (value === null || value === undefined || value === "") return 0;
+  const num = Number(value);
+  return Number.isNaN(num) ? 0 : num;
 }
 
 function isValidTimeRange(startValue, endValue) {
-  if (!startValue || !endValue) return true
-  return String(startValue) < String(endValue)
+  if (!startValue || !endValue) return true;
+  return String(startValue) < String(endValue);
 }
 
 function buildEditPayload(form) {
@@ -95,132 +96,142 @@ function buildEditPayload(form) {
     end: form.end,
     available: form.available,
     amount: normalizeAmountInput(form.amount),
-    currency: String(form.currency ?? '').trim() || 'CNY',
+    currency: String(form.currency ?? "").trim() || "CNY",
     duration: calcDurationMinutes(form.start, form.end),
-    type: String(form.type ?? '').trim() || 'online',
-    detail: String(form.detail ?? '').trim()
-  }
+    type: String(form.type ?? "").trim() || "online",
+    detail: String(form.detail ?? "").trim(),
+  };
 }
 
 function sortSlots(rows) {
   return [...rows].sort((a, b) =>
-    (a.date + a.start).localeCompare(b.date + b.start)
-  )
+    (a.date + a.start).localeCompare(b.date + b.start),
+  );
 }
-
 async function loadSlots() {
-  loading.value = true
+  loading.value = true;
   try {
-    const res = await api.specialistListSlots()
-    slots.value = sortSlots(Array.isArray(res) ? res : [])
+    const res = await api.specialistListSlots();
+    slots.value = sortSlots(Array.isArray(res) ? res : []);
   } catch (e) {
-    error.value = e?.message || 'Failed to load'
-    showAlertModal({ type: 'error', message: error.value })
+    error.value = e?.message || "Failed to load";
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 async function loadPricingRules() {
-  pricingRulesLoading.value = true
-  pricingRulesError.value = ''
+  pricingRulesLoading.value = true;
+  pricingRulesError.value = "";
   try {
-    const rows = await api.specialistListPricingRules()
-    pricingRules.value = Array.isArray(rows) ? rows : []
+    const rows = await api.specialistListPricingRules();
+    pricingRules.value = Array.isArray(rows) ? rows : [];
   } catch (e) {
-    pricingRules.value = []
-    pricingRulesError.value = e?.message || 'Failed to load your pricing rules.'
+    pricingRules.value = [];
+    pricingRulesError.value =
+      e?.message || "Failed to load your pricing rules.";
   } finally {
-    pricingRulesLoading.value = false
+    pricingRulesLoading.value = false;
   }
 }
 
 async function handleDelete(id) {
-  if (!confirm('Delete this slot?')) return
-  deletingId.value = id
+  if (!confirm("Delete this slot?")) return;
+  deletingId.value = id;
   try {
-    await api.specialistDeleteSlot(id)
-    await loadSlots()
-    success.value = `Slot ${id} deleted`
-    showAlertModal({ type: 'success', message: success.value })
+    await api.specialistDeleteSlot(id);
+    await loadSlots();
+    success.value = `Slot ${id} deleted`;
+    showAlertModal({ type: "success", message: success.value });
   } catch (e) {
-    error.value = e?.message || 'Delete failed'
-    showAlertModal({ type: 'error', message: error.value })
+    error.value = e?.message || "Delete failed";
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    deletingId.value = ''
+    deletingId.value = "";
   }
 }
-
 async function handleEdit(id) {
-  if (!id) return
-  editOpen.value = true
-  editLoading.value = true
-  editingSlotId.value = String(id)
+  if (!id) return;
+  editOpen.value = true;
+  editLoading.value = true;
+  editingSlotId.value = String(id);
   try {
-    const slot = await api.specialistGetSlot(id)
+    const slot = await api.specialistGetSlot(id);
     editForm.value = {
-      date: slot?.date || new Date().toISOString().split('T')[0],
-      start: slot?.start || '09:00',
-      end: slot?.end || '09:30',
+      date: slot?.date || new Date().toISOString().split("T")[0],
+      start: slot?.start || "09:00",
+      end: slot?.end || "09:30",
       available: slot?.available ?? true,
-      amount: slot?.amount?.toString() || '0.00',
-      currency: slot?.currency || 'CNY',
-      type: slot?.type || 'online',
-      detail: slot?.detail || ''
-    }
+      amount: slot?.amount?.toString() || "0.00",
+      currency: slot?.currency || "CNY",
+      type: slot?.type || "online",
+      detail: slot?.detail || "",
+    };
   } catch (e) {
-    editOpen.value = false
-    error.value = e?.message || 'Failed to load slot details'
-    showAlertModal({ type: 'error', message: error.value })
+    editOpen.value = false;
+    error.value = e?.message || "Failed to load slot details";
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    editLoading.value = false
+    editLoading.value = false;
   }
 }
 
 function closeEditModal() {
-  if (editSaving.value) return
-  editOpen.value = false
-  editLoading.value = false
-  editingSlotId.value = ''
+  if (editSaving.value) return;
+  editOpen.value = false;
+  editLoading.value = false;
+  editingSlotId.value = "";
 }
-
 async function saveEditSlot() {
-  if (!editingSlotId.value) return
+  if (!editingSlotId.value) return;
   if (!editForm.value.date || !editForm.value.start || !editForm.value.end) {
-    showAlertModal({ type: 'error', message: 'Please complete date, start time, and end time.' })
-    return
+    showAlertModal({
+      type: "error",
+      message: "Please complete date, start time, and end time.",
+    });
+    return;
   }
   if (!isValidTimeRange(editForm.value.start, editForm.value.end)) {
-    showAlertModal({ type: 'error', message: 'Start time must be earlier than end time.' })
-    return
+    showAlertModal({
+      type: "error",
+      message: "Start time must be earlier than end time.",
+    });
+    return;
   }
   if (calcDurationMinutes(editForm.value.start, editForm.value.end) <= 0) {
-    showAlertModal({ type: 'error', message: 'Please enter a valid duration in minutes.' })
-    return
+    showAlertModal({
+      type: "error",
+      message: "Please enter a valid duration in minutes.",
+    });
+    return;
   }
 
-  editSaving.value = true
+  editSaving.value = true;
   try {
-    await api.specialistUpdateSlot(editingSlotId.value, buildEditPayload(editForm.value))
-    await loadSlots()
-    success.value = `Slot ${editingSlotId.value} updated`
-    showAlertModal({ type: 'success', message: success.value })
-    closeEditModal()
+    await api.specialistUpdateSlot(
+      editingSlotId.value,
+      buildEditPayload(editForm.value),
+    );
+    await loadSlots();
+    success.value = `Slot ${editingSlotId.value} updated`;
+    showAlertModal({ type: "success", message: success.value });
+    closeEditModal();
   } catch (e) {
-    error.value = e?.message || 'Failed to update slot'
-    showAlertModal({ type: 'error', message: error.value })
+    error.value = e?.message || "Failed to update slot";
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    editSaving.value = false
+    editSaving.value = false;
   }
 }
 
 function goToCreate() {
-  router.push({ name: 'specialist.slotCreate' })
+  router.push({ name: "specialist.slotCreate" });
 }
 
 onMounted(async () => {
-  await Promise.all([loadSlots(), loadPricingRules()])
-})
+  await Promise.all([loadSlots(), loadPricingRules()]);
+});
 </script>
 
 <template>
@@ -231,16 +242,12 @@ onMounted(async () => {
         <p class="subtitle">Manage your consultation slots</p>
       </div>
 
-      <!-- ✅ btn-neutral（不会再被覆盖） -->
-      <button class="btn-neutral" @click="goToCreate">
-        Create Slot
-      </button>
+      <button class="btn-neutral" @click="goToCreate">Create Slot</button>
     </header>
 
     <section class="calc-card">
       <div v-if="error" class="banner banner--error">{{ error }}</div>
       <div v-if="success" class="banner banner--success">{{ success }}</div>
-
 
       <div class="table-wrap">
         <table class="table">
@@ -257,19 +264,14 @@ onMounted(async () => {
 
           <tbody>
             <tr v-for="slot in formattedSlots" :key="slot.id">
-              
-              <td>
-                {{ slot.formattedDate }} {{ slot.start }}-{{ slot.end }}
-              </td>
+              <td>{{ slot.formattedDate }} {{ slot.start }}-{{ slot.end }}</td>
 
               <td>{{ slot.formattedAmount }}</td>
 
-              <td>
-                {{ slot.formattedDuration }} · {{ slot.formattedType }}
-              </td>
+              <td>{{ slot.formattedDuration }} · {{ slot.formattedType }}</td>
 
               <td class="cell--detail" :title="slot.detail">
-                {{ slot.detail || '--' }}
+                {{ slot.detail || "--" }}
               </td>
 
               <td>
@@ -277,7 +279,7 @@ onMounted(async () => {
                   class="status-pill"
                   :class="{ 'status-pill--off': !slot.available }"
                 >
-                  {{ slot.available ? 'Available' : 'Unavailable' }}
+                  {{ slot.available ? "Available" : "Unavailable" }}
                 </span>
               </td>
 
@@ -292,22 +294,22 @@ onMounted(async () => {
                     @click="handleDelete(slot.id)"
                     :disabled="deletingId === slot.id"
                   >
-                    {{ deletingId === slot.id ? 'Deleting...' : 'Delete' }}
+                    {{ deletingId === slot.id ? "Deleting..." : "Delete" }}
                   </button>
                 </div>
               </td>
-
             </tr>
           </tbody>
         </table>
 
-        <div v-if="!loading && !formattedSlots.length" class="state state--empty">
+        <div
+          v-if="!loading && !formattedSlots.length"
+          class="state state--empty"
+        >
           No slots found.
         </div>
 
-        <div v-if="loading" class="state">
-          Loading slots...
-        </div>
+        <div v-if="loading" class="state">Loading slots...</div>
       </div>
     </section>
   </section>
@@ -322,7 +324,12 @@ onMounted(async () => {
           <div class="field-grid field-grid--two">
             <label class="field">
               <span class="label">Date</span>
-              <input v-model="editForm.date" type="date" class="input" :disabled="editSaving" />
+              <input
+                v-model="editForm.date"
+                type="date"
+                class="input"
+                :disabled="editSaving"
+              />
             </label>
 
             <div class="field">
@@ -340,7 +347,9 @@ onMounted(async () => {
                 <button
                   type="button"
                   class="option-btn option-btn--type"
-                  :class="{ 'option-btn--active': editForm.available === false }"
+                  :class="{
+                    'option-btn--active': editForm.available === false,
+                  }"
                   :disabled="editSaving"
                   @click="editForm.available = false"
                 >
@@ -353,22 +362,43 @@ onMounted(async () => {
           <div class="field-grid field-grid--two">
             <label class="field">
               <span class="label">Start Time</span>
-              <input v-model="editForm.start" type="time" class="input" :disabled="editSaving" />
+              <input
+                v-model="editForm.start"
+                type="time"
+                class="input"
+                :disabled="editSaving"
+              />
             </label>
             <label class="field">
               <span class="label">End Time</span>
-              <input v-model="editForm.end" type="time" class="input" :disabled="editSaving" />
+              <input
+                v-model="editForm.end"
+                type="time"
+                class="input"
+                :disabled="editSaving"
+              />
             </label>
           </div>
 
           <div class="field-grid field-grid--two">
             <label class="field">
               <span class="label">Amount</span>
-              <input v-model="editForm.amount" type="number" step="0.01" min="0" class="input" :disabled="editSaving" />
+              <input
+                v-model="editForm.amount"
+                type="number"
+                step="0.01"
+                min="0"
+                class="input"
+                :disabled="editSaving"
+              />
             </label>
             <label class="field">
               <span class="label">Currency</span>
-              <select v-model="editForm.currency" class="input input--select" :disabled="editSaving">
+              <select
+                v-model="editForm.currency"
+                class="input input--select"
+                :disabled="editSaving"
+              >
                 <option value="CNY">CNY</option>
                 <option value="USD">USD</option>
                 <option value="EUR">EUR</option>
@@ -379,11 +409,20 @@ onMounted(async () => {
           <div class="field-grid field-grid--two">
             <label class="field">
               <span class="label">Duration (minutes, auto)</span>
-              <input :value="calcDurationMinutes(editForm.start, editForm.end)" type="number" class="input" readonly />
+              <input
+                :value="calcDurationMinutes(editForm.start, editForm.end)"
+                type="number"
+                class="input"
+                readonly
+              />
             </label>
             <label class="field">
               <span class="label">Type</span>
-              <select v-model="editForm.type" class="input input--select" :disabled="editSaving">
+              <select
+                v-model="editForm.type"
+                class="input input--select"
+                :disabled="editSaving"
+              >
                 <option value="online">Online</option>
                 <option value="offline">Offline</option>
               </select>
@@ -399,7 +438,9 @@ onMounted(async () => {
               maxlength="300"
               :disabled="editSaving"
             ></textarea>
-            <p class="detail-count">{{ (editForm.detail || '').length }}/{{ DETAIL_MAX }}</p>
+            <p class="detail-count">
+              {{ (editForm.detail || "").length }}/{{ DETAIL_MAX }}
+            </p>
           </label>
 
           <div class="form-actions">
@@ -410,24 +451,42 @@ onMounted(async () => {
                   Loading your pricing rules...
                 </template>
                 <template v-else-if="pricingRules.length">
-                  <div class="tooltip-title"> Please follow your recommended Price!<br>
+                  <div class="tooltip-title">
+                    Please follow your recommended Price!<br />
                     Otherwise you will be punished!
                   </div>
-                  <div v-for="rule in pricingRulesPreview" :key="rule.id" class="tooltip-rule">
-                    {{ rule.duration }} min {{ rule.type }}: {{ formatCurrency(rule.amount, rule.currency) }}
+                  <div
+                    v-for="rule in pricingRulesPreview"
+                    :key="rule.id"
+                    class="tooltip-rule"
+                  >
+                    {{ rule.duration }} min {{ rule.type }}:
+                    {{ formatCurrency(rule.amount, rule.currency) }}
                   </div>
                   <div v-if="extraPricingRulesCount" class="tooltip-more">
                     +{{ extraPricingRulesCount }} more rules
                   </div>
                 </template>
                 <template v-else>
-                  {{ pricingRulesError || 'No pricing rules found.' }}
+                  {{ pricingRulesError || "No pricing rules found." }}
                 </template>
               </div>
             </div>
-            <button type="button" class="action-btn modal-cancel" :disabled="editSaving" @click="closeEditModal">Cancel</button>
-            <button type="button" class="btn-primary modal-save" :disabled="editSaving" @click="saveEditSlot">
-              {{ editSaving ? 'Saving...' : 'Update Slot' }}
+            <button
+              type="button"
+              class="action-btn modal-cancel"
+              :disabled="editSaving"
+              @click="closeEditModal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn-primary modal-save"
+              :disabled="editSaving"
+              @click="saveEditSlot"
+            >
+              {{ editSaving ? "Saving..." : "Update Slot" }}
             </button>
           </div>
         </div>
@@ -445,7 +504,7 @@ onMounted(async () => {
   margin-top: 12px;
 }
 
-/* 感叹号 */
+
 .icon {
   width: 18px;
   height: 18px;
@@ -458,13 +517,12 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-
 }
 
-/* tooltip 本体 */
+
 .tooltip {
   position: absolute;
-  bottom: 130%; /* 在上方 */
+  bottom: 130%; 
   left: 50%;
   transform: translateX(-50%);
   width: 280px;
@@ -482,7 +540,7 @@ onMounted(async () => {
   transition: opacity 0.2s ease;
 }
 
-/* hover 显示 */
+
 .tooltip-title {
   margin-bottom: 6px;
   font-weight: 700;
@@ -522,12 +580,11 @@ onMounted(async () => {
 
 .calc-card {
   background: #fff;
-  border: 1px solid rgba(17,24,39,0.1);
+  border: 1px solid rgba(17, 24, 39, 0.1);
   border-radius: 0;
   padding: 16px;
   box-shadow: 0 8px 18px rgba(17, 24, 39, 0.06);
 }
-
 
 .btn-neutral {
   height: 44px;
@@ -543,7 +600,6 @@ onMounted(async () => {
 .btn-neutral:hover {
   opacity: 0.92;
 }
-
 
 .table-wrap {
   overflow-x: auto;
@@ -582,19 +638,18 @@ onMounted(async () => {
   align-items: center;
   height: 28px;
   padding: 0 10px;
-  border: 1px solid rgba(34,197,94,0.3);
-  background: rgba(34,197,94,0.08);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.08);
   color: #166534;
   font-size: 12px;
   font-weight: 700;
 }
 
 .status-pill--off {
-  border-color: rgba(248,113,113,0.3);
-  background: rgba(248,113,113,0.12);
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(248, 113, 113, 0.12);
   color: #991b1b;
 }
-
 
 .row-actions {
   display: flex;
@@ -617,7 +672,7 @@ onMounted(async () => {
   color: #a94442;
 }
 
-/* 状态 */
+
 .state {
   text-align: center;
   padding: 16px;

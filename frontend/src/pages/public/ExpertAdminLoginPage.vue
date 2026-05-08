@@ -35,7 +35,6 @@ function switchLoginMode(mode) {
   loginMode.value = mode;
   error.value = "";
 }
-
 async function onSendCode() {
   if (!email.value || sendingCode.value || codeCountdown.value > 0) return;
   error.value = "";
@@ -53,12 +52,12 @@ async function onSendCode() {
       }
     }, 1000);
   } catch (e) {
-    error.value = e?.message || e?.data?.message || "Failed to send verification code";
+    error.value =
+      e?.message || e?.data?.message || "Failed to send verification code";
   } finally {
     sendingCode.value = false;
   }
 }
-
 async function onSubmit() {
   error.value = "";
   if (!email.value.trim()) {

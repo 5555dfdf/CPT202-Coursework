@@ -1,73 +1,68 @@
 ﻿<script setup>
-import { onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
-import { api } from '@/api/client'
-import { showConfirmModal } from '@/ui/confirmModal.js'
-const status = ref('Pending')
-const page = ref({ items: [], total: 0 })
-const loading = ref(false)
-const error = ref('')
-const busyId = ref('')
-const rejectReason = ref('')
+import { onMounted, ref, watch } from "vue";
+import { RouterLink } from "vue-router";
+import { api } from "@/api/client";
+import { showConfirmModal } from "@/ui/confirmModal.js";
 
-/**
- * Fetch data from the API based on current filter status
- */
+const status = ref("Pending");
+const page = ref({ items: [], total: 0 });
+const loading = ref(false);
+const error = ref("");
+const busyId = ref("");
+const rejectReason = ref("");
 async function load() {
-  error.value = ''
-  loading.value = true
+  error.value = "";
+  loading.value = true;
   try {
-    const params = { pageSize: 50 }
-    if (status.value) params.status = status.value
-    page.value = await api.listBookingRequests(params)
+    const params = { pageSize: 50 };
+    if (status.value) params.status = status.value;
+    page.value = await api.listBookingRequests(params);
   } catch (e) {
-    error.value = e?.message || 'Failed to load'
-    page.value = { items: [], total: 0 }
+    error.value = e?.message || "Failed to load";
+    page.value = { items: [], total: 0 };
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
-// initial load on component mount
-onMounted(load)
-
-// automatically re-fetch data whenever the status filter changes
-watch(status, () => load())
+onMounted(load);
+watch(status, () => load());
 
 function onConfirm(id) {
   showConfirmModal({
-    title: 'Confirm acceptance',
-    message: 'Are you sure you want to accept this reservation?',
+    title: "Confirm acceptance",
+    message: "Are you sure you want to accept this reservation?",
     onConfirm: async () => {
-      busyId.value = id
+      busyId.value = id;
       try {
-        await api.confirmBooking(id)
-        await load()
+        await api.confirmBooking(id);
+        await load();
       } catch (e) {
-        error.value = e?.message || 'Failed to confirm'
+        error.value = e?.message || "Failed to confirm";
       } finally {
-        busyId.value = ''
+        busyId.value = "";
       }
-    }
-  })
+    },
+  });
 }
-// handles the rejection of a booking request
 function onReject(id) {
   showConfirmModal({
-    title: 'Refuse Reservation',
-    message: 'Are you sure you want to decline this reservation',
+    title: "Refuse Reservation",
+    message: "Are you sure you want to decline this reservation",
     onConfirm: async () => {
-      busyId.value = id
+      busyId.value = id;
       try {
-        await api.rejectBooking(id, { reason: rejectReason.value.trim() || undefined })
-        rejectReason.value = ''
-        await load()
+        await api.rejectBooking(id, {
+          reason: rejectReason.value.trim() || undefined,
+        });
+        rejectReason.value = "";
+        await load();
       } catch (e) {
-        error.value = e?.message || 'Failed to reject'
+        error.value = e?.message || "Failed to reject";
       } finally {
-        busyId.value = ''
+        busyId.value = "";
       }
-    }
-  })
+    },
+  });
 }
 </script>
 
@@ -86,12 +81,18 @@ function onReject(id) {
           <option value="Confirmed">Confirmed</option>
         </select>
       </label>
-      <button type="button" class="btn" :disabled="loading" @click="load">Refresh</button>
+      <button type="button" class="btn" :disabled="loading" @click="load">
+        Refresh
+      </button>
     </div>
 
-    <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
+    <div v-if="error" class="banner banner--error" role="alert">
+      {{ error }}
+    </div>
 
-    <div v-if="loading && !(page.items || []).length" class="card muted">Loading…</div>
+    <div v-if="loading && !(page.items || []).length" class="card muted">
+      Loading…
+    </div>
 
     <div v-else-if="!(page.items || []).length" class="empty">
       <div class="empty__title">No records</div>
@@ -100,32 +101,37 @@ function onReject(id) {
     <ul v-else class="list">
       <li v-for="b in page.items" :key="b.id" class="card item">
         <div class="item__main">
-          <RouterLink class="mono link" :to="{ name: 'specialist.bookingDetail', params: { id: b.id } }">
+          <RouterLink
+            class="mono link"
+            :to="{ name: 'specialist.bookingDetail', params: { id: b.id } }"
+          >
             {{ b.id }}
           </RouterLink>
-          <div class="muted small">{{ b.customerName ?? b.customerId ?? '—' }}</div>
+          <div class="muted small">
+            {{ b.customerName ?? b.customerId ?? "—" }}
+          </div>
           <div class="small">{{ b.time ?? b.startTime }}</div>
           <div class="badge">{{ b.status }}</div>
         </div>
         <div class="actions">
           <input
-              v-model="rejectReason"
-              class="input input--sm"
-              placeholder="Rejection reason (optional)"
+            v-model="rejectReason"
+            class="input input--sm"
+            placeholder="Rejection reason (optional)"
           />
           <button
-              type="button"
-              class="btn btn--ok"
-              :disabled="busyId === b.id"
-              @click="onConfirm(b.id)"
+            type="button"
+            class="btn btn--ok"
+            :disabled="busyId === b.id"
+            @click="onConfirm(b.id)"
           >
             Confirm
           </button>
           <button
-              type="button"
-              class="btn btn--danger"
-              :disabled="busyId === b.id"
-              @click="onReject(b.id)"
+            type="button"
+            class="btn btn--danger"
+            :disabled="busyId === b.id"
+            @click="onReject(b.id)"
           >
             Reject
           </button>
@@ -136,7 +142,7 @@ function onReject(id) {
 </template>
 
 <style scoped>
-/* Page & Header Typography */
+
 .page__header {
   margin: 8px 0 20px;
   padding: 0;
@@ -148,7 +154,7 @@ function onReject(id) {
   font-weight: 800;
   line-height: 1.12;
 }
-/* Filter Toolbar Layout */
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -161,7 +167,7 @@ function onReject(id) {
   background: #ffffff;
   box-shadow: 0 8px 18px rgba(17, 24, 39, 0.06);
 }
-/* Form Fields & Inputs */
+
 .field {
   display: grid;
   gap: 8px;
@@ -184,7 +190,7 @@ function onReject(id) {
   min-width: 140px;
   flex: 1;
 }
-/* Button Components */
+
 .btn {
   height: 40px;
   padding: 0 14px;
@@ -210,7 +216,7 @@ function onReject(id) {
 .btn:disabled {
   opacity: 0.55;
 }
-/* Utility Classes */
+
 .muted {
   color: #6b7280;
 }
@@ -271,7 +277,7 @@ function onReject(id) {
   border-radius: 0;
   font-size: 13px;
 }
-/* Error Banner & Empty State Styling */
+
 .banner--error {
   border: 1px solid rgba(248, 113, 113, 0.45);
   background: rgba(248, 113, 113, 0.12);

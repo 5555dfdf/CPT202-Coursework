@@ -1,64 +1,73 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { api } from '@/api/client'
-import { showAlertModal } from '@/ui/alertModal'
+import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import { api } from "@/api/client";
+import { showAlertModal } from "@/ui/alertModal";
+const router = useRouter();
 
-const router = useRouter()
-
-const specialists = ref([])
-const specialistsLoading = ref(false)
-const createLoading = ref(false)
-
+const specialists = ref([]);
+const specialistsLoading = ref(false);
+const createLoading = ref(false);
 const createForm = ref({
-  specialistId: '',
+  specialistId: "",
   duration: 60,
-  type: 'online',
-  amount: '0.00',
-  currency: 'CNY',
-  detail: ''
-})
+  type: "online",
+  amount: "0.00",
+  currency: "CNY",
+  detail: "",
+});
 
 const specialistMap = computed(() => {
   return new Map(
-    specialists.value.map((row) => [String(row?.id ?? '').trim(), String(row?.name ?? '').trim()])
-  )
-})
+    specialists.value.map((row) => [
+      String(row?.id ?? "").trim(),
+      String(row?.name ?? "").trim(),
+    ]),
+  );
+});
 
 function formatSpecialistLabel(idValue) {
-  const id = String(idValue || '').trim()
-  const name = specialistMap.value.get(id) || ''
-  if (name && id) return `${name} (${id})`
-  return name || id || '--'
+  const id = String(idValue || "").trim();
+  const name = specialistMap.value.get(id) || "";
+  if (name && id) return `${name} (${id})`;
+  return name || id || "--";
 }
 
 function normalizeAmountInput(value) {
-  if (value === null || value === undefined || value === '') return 0
-  const num = Number(value)
-  return Number.isNaN(num) ? 0 : num
+  if (value === null || value === undefined || value === "") return 0;
+  const num = Number(value);
+  return Number.isNaN(num) ? 0 : num;
 }
 
 function buildRulePayload(form) {
   return {
-    specialistId: String(form.specialistId ?? '').trim(),
+    specialistId: String(form.specialistId ?? "").trim(),
     duration: Number(form.duration),
-    type: String(form.type ?? '').trim().toLowerCase(),
+    type: String(form.type ?? "")
+      .trim()
+      .toLowerCase(),
     amount: normalizeAmountInput(form.amount),
-    currency: String(form.currency ?? '').trim().toUpperCase() || 'CNY',
-    detail: String(form.detail ?? '').trim()
-  }
+    currency:
+      String(form.currency ?? "")
+        .trim()
+        .toUpperCase() || "CNY",
+    detail: String(form.detail ?? "").trim(),
+  };
 }
 
 async function loadSpecialists() {
-  specialistsLoading.value = true
+  specialistsLoading.value = true;
   try {
-    const page = await api.listSpecialists({ pageSize: 100 })
-    specialists.value = Array.isArray(page?.items) ? page.items : []
+    const page = await api.listSpecialists({ pageSize: 100 });
+    specialists.value = Array.isArray(page?.items) ? page.items : [];
   } catch (e) {
-    specialists.value = []
-    showAlertModal({ type: 'error', message: e?.message || 'Failed to load specialists' })
+    specialists.value = [];
+    showAlertModal({
+      type: "error",
+      message: e?.message || "Failed to load specialists",
+    });
   } finally {
-    specialistsLoading.value = false
+    specialistsLoading.value = false;
   }
 }
 
@@ -66,42 +75,56 @@ function resetCreateForm() {
   createForm.value = {
     specialistId: createForm.value.specialistId,
     duration: 60,
-    type: 'online',
-    amount: '0.00',
-    currency: 'CNY',
-    detail: ''
-  }
+    type: "online",
+    amount: "0.00",
+    currency: "CNY",
+    detail: "",
+  };
 }
-
 async function onCreate() {
   if (!createForm.value.specialistId) {
-    showAlertModal({ type: 'error', message: 'Please select a specialist for the new pricing rule.' })
-    return
+    showAlertModal({
+      type: "error",
+      message: "Please select a specialist for the new pricing rule.",
+    });
+    return;
   }
-  if (!Number.isFinite(Number(createForm.value.duration)) || Number(createForm.value.duration) <= 0) {
-    showAlertModal({ type: 'error', message: 'Please enter a valid duration in minutes.' })
-    return
+  if (
+    !Number.isFinite(Number(createForm.value.duration)) ||
+    Number(createForm.value.duration) <= 0
+  ) {
+    showAlertModal({
+      type: "error",
+      message: "Please enter a valid duration in minutes.",
+    });
+    return;
   }
-  if (!String(createForm.value.type || '').trim()) {
-    showAlertModal({ type: 'error', message: 'Please enter a session type.' })
-    return
+  if (!String(createForm.value.type || "").trim()) {
+    showAlertModal({ type: "error", message: "Please enter a session type." });
+    return;
   }
 
-  createLoading.value = true
+  createLoading.value = true;
   try {
-    await api.adminCreatePricingRule(buildRulePayload(createForm.value))
-    showAlertModal({ type: 'success', message: 'Pricing rule created successfully.' })
-    await router.push({ name: 'admin.pricing' })
+    await api.adminCreatePricingRule(buildRulePayload(createForm.value));
+    showAlertModal({
+      type: "success",
+      message: "Pricing rule created successfully.",
+    });
+    await router.push({ name: "admin.pricing" });
   } catch (e) {
-    showAlertModal({ type: 'error', message: e?.message || 'Failed to create pricing rule' })
+    showAlertModal({
+      type: "error",
+      message: e?.message || "Failed to create pricing rule",
+    });
   } finally {
-    createLoading.value = false
+    createLoading.value = false;
   }
 }
 
 onMounted(async () => {
-  await loadSpecialists()
-})
+  await loadSpecialists();
+});
 </script>
 
 <template>
@@ -109,9 +132,16 @@ onMounted(async () => {
     <header class="page__header">
       <div>
         <h1>Add New Price Rule</h1>
-        <p class="subtitle">Create a dedicated pricing rule for a specialist, duration, and session type.</p>
+        <p class="subtitle">
+          Create a dedicated pricing rule for a specialist, duration, and
+          session type.
+        </p>
       </div>
-      <button type="button" class="btn-neutral" @click="router.push({ name: 'admin.pricing' })">
+      <button
+        type="button"
+        class="btn-neutral"
+        @click="router.push({ name: 'admin.pricing' })"
+      >
         Back to Pricing
       </button>
     </header>
@@ -119,7 +149,11 @@ onMounted(async () => {
     <section class="calc-card">
       <label class="field">
         <span class="label">Specialist</span>
-        <select v-model="createForm.specialistId" class="input input--select" :disabled="specialistsLoading || createLoading">
+        <select
+          v-model="createForm.specialistId"
+          class="input input--select"
+          :disabled="specialistsLoading || createLoading"
+        >
           <option value="">Select a specialist</option>
           <option v-for="row in specialists" :key="row.id" :value="row.id">
             {{ formatSpecialistLabel(row.id) }}
@@ -130,7 +164,13 @@ onMounted(async () => {
       <div class="field-grid field-grid--two">
         <label class="field">
           <span class="label">Duration (minutes)</span>
-          <input v-model="createForm.duration" type="number" min="1" step="1" class="input" />
+          <input
+            v-model="createForm.duration"
+            type="number"
+            min="1"
+            step="1"
+            class="input"
+          />
         </label>
         <label class="field">
           <span class="label">Session Type</span>
@@ -144,24 +184,49 @@ onMounted(async () => {
       <div class="field-grid field-grid--two">
         <label class="field">
           <span class="label">Amount</span>
-          <input v-model="createForm.amount" type="number" min="0" step="0.01" class="input" />
+          <input
+            v-model="createForm.amount"
+            type="number"
+            min="0"
+            step="0.01"
+            class="input"
+          />
         </label>
         <label class="field">
           <span class="label">Currency</span>
-          <input v-model.trim="createForm.currency" type="text" maxlength="10" class="input" />
+          <input
+            v-model.trim="createForm.currency"
+            type="text"
+            maxlength="10"
+            class="input"
+          />
         </label>
       </div>
 
       <label class="field">
         <span class="label">Detail</span>
-        <textarea v-model="createForm.detail" class="input input--textarea" rows="3" />
+        <textarea
+          v-model="createForm.detail"
+          class="input input--textarea"
+          rows="3"
+        />
       </label>
 
       <div class="button-row">
-        <button type="button" class="btn-primary btn-primary--fit" :disabled="createLoading" @click="onCreate">
-          {{ createLoading ? 'Creating...' : 'Create Pricing Rule' }}
+        <button
+          type="button"
+          class="btn-primary btn-primary--fit"
+          :disabled="createLoading"
+          @click="onCreate"
+        >
+          {{ createLoading ? "Creating..." : "Create Pricing Rule" }}
         </button>
-        <button type="button" class="btn-neutral" :disabled="createLoading" @click="resetCreateForm">
+        <button
+          type="button"
+          class="btn-neutral"
+          :disabled="createLoading"
+          @click="resetCreateForm"
+        >
           Reset
         </button>
       </div>
@@ -247,7 +312,9 @@ onMounted(async () => {
   background-position:
     calc(100% - 18px) calc(50% - 3px),
     calc(100% - 12px) calc(50% - 3px);
-  background-size: 6px 6px, 6px 6px;
+  background-size:
+    6px 6px,
+    6px 6px;
   background-repeat: no-repeat;
   cursor: pointer;
 }

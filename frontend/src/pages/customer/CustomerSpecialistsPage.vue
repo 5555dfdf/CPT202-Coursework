@@ -1,153 +1,158 @@
 ﻿<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { api } from '@/api/client'
-import { formatReferencePrice } from '@/ui/referencePrice'
+import { computed, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import { api } from "@/api/client";
+import { formatReferencePrice } from "@/ui/referencePrice";
+// filter, paginate, open detail modal, book
 
-const expertiseList = ref([])
-const page = ref({ items: [], total: 0, page: 1, pageSize: 10 })
-const expertiseId = ref('')
-const keyword = ref('')
-const query = ref({ page: 1, pageSize: 10 })
-const loading = ref(false)
-const error = ref('')
-const router = useRouter()
+const expertiseList = ref([]);
+const page = ref({ items: [], total: 0, page: 1, pageSize: 10 });
+const expertiseId = ref("");
+const keyword = ref("");
+const query = ref({ page: 1, pageSize: 10 });
+const loading = ref(false);
+const error = ref("");
+const router = useRouter();
 
-const detailOpen = ref(false)
-const detailLoading = ref(false)
-const detailError = ref('')
-const detailSpecialist = ref(null)
+const detailOpen = ref(false);
+const detailLoading = ref(false);
+const detailError = ref("");
+const detailSpecialist = ref(null);
 
 const expertiseMap = computed(() => {
-  const map = new Map()
+  const map = new Map();
   for (const item of expertiseList.value || []) {
-    const id = String(item?.id ?? '').trim()
-    if (!id) continue
-    map.set(id, String(item?.name ?? id))
+    const id = String(item?.id ?? "").trim();
+    if (!id) continue;
+    map.set(id, String(item?.name ?? id));
   }
-  return map
-})
-
+  return map;
+});
 const filteredItems = computed(() => {
-  const q = keyword.value.trim().toLowerCase()
-  const items = (page.value.items ?? []).filter((s) => String(s?.status ?? '').toLowerCase() !== 'inactive')
-  if (!q) return items
+  const q = keyword.value.trim().toLowerCase();
+  const items = (page.value.items ?? []).filter(
+    (s) => String(s?.status ?? "").toLowerCase() !== "inactive",
+  );
+  if (!q) return items;
   return items.filter((s) => {
-    const name = (s.name ?? '').toLowerCase()
-    const ids = (s.expertiseIds ?? []).join(' ').toLowerCase()
-    return name.includes(q) || ids.includes(q)
-  })
-})
+    const name = (s.name ?? "").toLowerCase();
+    const ids = (s.expertiseIds ?? []).join(" ").toLowerCase();
+    return name.includes(q) || ids.includes(q);
+  });
+});
 
 function specialistExpertiseItems(s) {
-  const ids = Array.isArray(s?.expertiseIds) ? s.expertiseIds.map((id) => String(id)) : []
-  if (!ids.length) return ['--']
-  return ids.map((id) => expertiseMap.value.get(id) || id)
+  const ids = Array.isArray(s?.expertiseIds)
+    ? s.expertiseIds.map((id) => String(id))
+    : [];
+  if (!ids.length) return ["--"];
+  return ids.map((id) => expertiseMap.value.get(id) || id);
 }
 
 const detailExpertiseLabel = computed(() => {
-  const ex = detailSpecialist.value?.expertise
-  if (Array.isArray(ex) && ex.length) return ex.map((e) => e.name ?? e.id).join(', ')
-  return '--'
-})
+  const ex = detailSpecialist.value?.expertise;
+  if (Array.isArray(ex) && ex.length)
+    return ex.map((e) => e.name ?? e.id).join(", ");
+  return "--";
+});
 
 async function loadExpertise() {
   try {
-    expertiseList.value = await api.listExpertise()
+    expertiseList.value = await api.listExpertise();
   } catch {
-    expertiseList.value = []
+    expertiseList.value = [];
   }
 }
 
 async function loadSpecialists() {
-  error.value = ''
-  loading.value = true
+  error.value = "";
+  loading.value = true;
   try {
     const params = {
       page: query.value.page,
-      pageSize: query.value.pageSize
-    }
-    if (expertiseId.value) params.expertiseId = expertiseId.value
-    page.value = await api.listSpecialists(params)
+      pageSize: query.value.pageSize,
+    };
+    if (expertiseId.value) params.expertiseId = expertiseId.value;
+    page.value = await api.listSpecialists(params);
   } catch (e) {
-    error.value = e?.message || 'Failed to load'
-    page.value = { items: [], total: 0, page: 1, pageSize: 10 }
+    error.value = e?.message || "Failed to load";
+    page.value = { items: [], total: 0, page: 1, pageSize: 10 };
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
-
 function totalPages() {
-  const total = Number(page.value.total || 0)
-  const size = Number(page.value.pageSize || query.value.pageSize || 10)
-  return Math.max(1, Math.ceil(total / size))
+  const total = Number(page.value.total || 0);
+  const size = Number(page.value.pageSize || query.value.pageSize || 10);
+  return Math.max(1, Math.ceil(total / size));
 }
 
 function prevPage() {
-  if (loading.value || query.value.page <= 1) return
-  query.value.page -= 1
-  loadSpecialists()
+  if (loading.value || query.value.page <= 1) return;
+  query.value.page -= 1;
+  loadSpecialists();
 }
 
 function nextPage() {
-  if (loading.value || query.value.page >= totalPages()) return
-  query.value.page += 1
-  loadSpecialists()
+  if (loading.value || query.value.page >= totalPages()) return;
+  query.value.page += 1;
+  loadSpecialists();
 }
 
 function onPageSizeChange() {
-  query.value.page = 1
-  loadSpecialists()
+  query.value.page = 1;
+  loadSpecialists();
 }
-
 async function openDetail(id) {
-  if (!id) return
-  detailOpen.value = true
-  detailLoading.value = true
-  detailError.value = ''
-  detailSpecialist.value = null
+  if (!id) return;
+  detailOpen.value = true;
+  detailLoading.value = true;
+  detailError.value = "";
+  detailSpecialist.value = null;
   try {
-    detailSpecialist.value = await api.getSpecialist(id)
+    detailSpecialist.value = await api.getSpecialist(id);
   } catch (e) {
-    detailError.value = e?.message || 'Failed to load specialist details'
+    detailError.value = e?.message || "Failed to load specialist details";
   } finally {
-    detailLoading.value = false
+    detailLoading.value = false;
   }
 }
 
 function closeDetail() {
-  if (detailLoading.value) return
-  detailOpen.value = false
-  detailError.value = ''
-  detailSpecialist.value = null
+  if (detailLoading.value) return;
+  detailOpen.value = false;
+  detailError.value = "";
+  detailSpecialist.value = null;
 }
 
 function goToBookingFromDetail() {
-  const id = detailSpecialist.value?.id
-  if (!id) return
-  closeDetail()
-  router.push({ name: 'customer.specialistSlots', params: { id } })
+  const id = detailSpecialist.value?.id;
+  if (!id) return;
+  closeDetail();
+  router.push({ name: "customer.specialistSlots", params: { id } });
 }
 onMounted(async () => {
-  await loadExpertise()
-  await loadSpecialists()
-})
+  await loadExpertise();
+  await loadSpecialists();
+});
 
 watch(expertiseId, () => {
-  query.value.page = 1
-  loadSpecialists()
-})
+  query.value.page = 1;
+  loadSpecialists();
+});
 watch(keyword, () => {
-  query.value.page = 1
-})
+  query.value.page = 1;
+});
 </script>
 
 <template>
   <section class="page">
     <header class="page__header">
       <h1>Specialists</h1>
-      <p class="subtitle">Find the right specialist and view available booking details.</p>
+      <p class="subtitle">
+        Find the right specialist and view available booking details.
+      </p>
     </header>
 
     <div class="panel">
@@ -170,12 +175,23 @@ watch(keyword, () => {
           placeholder="Name or expertise ID..."
         />
       </label>
-      <button type="button" class="btn" :disabled="loading" @click="loadSpecialists">Refresh</button>
+      <button
+        type="button"
+        class="btn"
+        :disabled="loading"
+        @click="loadSpecialists"
+      >
+        Refresh
+      </button>
     </div>
 
-    <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
+    <div v-if="error" class="banner banner--error" role="alert">
+      {{ error }}
+    </div>
 
-    <div v-if="loading && !(page.items || []).length" class="card muted">Loading...</div>
+    <div v-if="loading && !(page.items || []).length" class="card muted">
+      Loading...
+    </div>
 
     <div v-else-if="!filteredItems.length && !error" class="empty">
       <div class="empty__title">No specialists found</div>
@@ -186,7 +202,7 @@ watch(keyword, () => {
       <li v-for="s in filteredItems" :key="s.id" class="card card--row">
         <div class="card-top">
           <div class="card-main">
-            <div class="name">{{ s.name ?? '--' }}</div>
+            <div class="name">{{ s.name ?? "--" }}</div>
             <div class="meta-line">
               <span
                 v-for="item in specialistExpertiseItems(s)"
@@ -197,7 +213,10 @@ watch(keyword, () => {
               </span>
             </div>
             <div v-if="s.price != null" class="meta-line meta-line--below">
-              <span class="price-text">Reference Price: {{ formatReferencePrice(s.price, s.currency) }}</span>
+              <span class="price-text"
+                >Reference Price:
+                {{ formatReferencePrice(s.price, s.currency) }}</span
+              >
             </div>
           </div>
           <div class="card-actions">
@@ -210,16 +229,33 @@ watch(keyword, () => {
     </ul>
 
     <div v-if="(page.items || []).length" class="pager">
-      <button type="button" class="btn btn--ghost" :disabled="loading || query.page <= 1" @click="prevPage">
+      <button
+        type="button"
+        class="btn btn--ghost"
+        :disabled="loading || query.page <= 1"
+        @click="prevPage"
+      >
         Prev
       </button>
-      <span class="pager__info">Page {{ page.page }} / {{ totalPages() }} · Total {{ page.total }}</span>
-      <button type="button" class="btn btn--ghost" :disabled="loading || query.page >= totalPages()" @click="nextPage">
+      <span class="pager__info"
+        >Page {{ page.page }} / {{ totalPages() }} · Total
+        {{ page.total }}</span
+      >
+      <button
+        type="button"
+        class="btn btn--ghost"
+        :disabled="loading || query.page >= totalPages()"
+        @click="nextPage"
+      >
         Next
       </button>
       <label class="pager-size">
         <span>Page Size</span>
-        <select v-model.number="query.pageSize" class="pager-size__select" @change="onPageSizeChange">
+        <select
+          v-model.number="query.pageSize"
+          class="pager-size__select"
+          @change="onPageSizeChange"
+        >
           <option :value="10">10</option>
           <option :value="20">20</option>
         </select>
@@ -237,11 +273,15 @@ watch(keyword, () => {
           <div class="detail-list">
             <div class="detail-row">
               <span class="detail-key">Name</span>
-              <span class="detail-value">{{ detailSpecialist.name ?? '--' }}</span>
+              <span class="detail-value">{{
+                detailSpecialist.name ?? "--"
+              }}</span>
             </div>
             <div class="detail-row detail-row--block">
               <span class="detail-key">Bio</span>
-              <p class="detail-bio">{{ detailSpecialist.bio ?? 'No bio available.' }}</p>
+              <p class="detail-bio">
+                {{ detailSpecialist.bio ?? "No bio available." }}
+              </p>
             </div>
             <div class="detail-row detail-row--block">
               <span class="detail-key">Expertise</span>
@@ -249,16 +289,31 @@ watch(keyword, () => {
             </div>
             <div v-if="detailSpecialist.price != null" class="detail-row">
               <span class="detail-key">Reference Price</span>
-              <span class="detail-value">{{ formatReferencePrice(detailSpecialist.price, detailSpecialist.currency) }}</span>
+              <span class="detail-value">{{
+                formatReferencePrice(
+                  detailSpecialist.price,
+                  detailSpecialist.currency,
+                )
+              }}</span>
             </div>
           </div>
         </template>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn--ghost modal-btn" :disabled="detailLoading" @click="closeDetail">
+          <button
+            type="button"
+            class="btn btn--ghost modal-btn"
+            :disabled="detailLoading"
+            @click="closeDetail"
+          >
             Cancel
           </button>
-          <button type="button" class="btn modal-btn" :disabled="detailLoading || !detailSpecialist?.id" @click="goToBookingFromDetail">
+          <button
+            type="button"
+            class="btn modal-btn"
+            :disabled="detailLoading || !detailSpecialist?.id"
+            @click="goToBookingFromDetail"
+          >
             Book Now
           </button>
         </div>
@@ -617,4 +672,3 @@ select.input {
   }
 }
 </style>
-

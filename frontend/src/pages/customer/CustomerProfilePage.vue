@@ -1,282 +1,310 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import { api } from '@/api/client'
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useAuthStore } from "@/stores/auth";
+import { api } from "@/api/client";
 
-const auth = useAuthStore()
-const name = ref('')
-const originalName = ref('')
-const editName = ref('')
-const email = ref('')
-const role = ref('')
-const loading = ref(false)
-const saving = ref(false)
-const error = ref('')
-const ok = ref('')
-const okTimer = ref(null)
-const editOpen = ref(false)
+const auth = useAuthStore();
+const name = ref("");
+const originalName = ref("");
+const editName = ref("");
+const email = ref("");
+const role = ref("");
+const loading = ref(false);
+const saving = ref(false);
+const error = ref("");
+const ok = ref("");
+const okTimer = ref(null);
+const editOpen = ref(false);
 
-const showPasswordForm = ref(false)
-const pwdSaving = ref(false)
-const pwdError = ref('')
-const pwdOk = ref('')
-const pwdOkTimer = ref(null)
-const showCurrentPassword = ref(false)
-const showNewPassword = ref(false)
-const showConfirmPassword = ref(false)
-const currentPassword = ref('')
-const newPassword = ref('')
-const confirmPassword = ref('')
+const showPasswordForm = ref(false);
+const pwdSaving = ref(false);
+const pwdError = ref("");
+const pwdOk = ref("");
+const pwdOkTimer = ref(null);
+const showCurrentPassword = ref(false);
+const showNewPassword = ref(false);
+const showConfirmPassword = ref(false);
+const currentPassword = ref("");
+const newPassword = ref("");
+const confirmPassword = ref("");
 
-const avatarPalette = ['#1f6feb', '#0e9f6e', '#dc6b19', '#b83ad8', '#d9486f', '#0f766e', '#7c3aed', '#2563eb']
-
+const avatarPalette = [
+  "#1f6feb",
+  "#0e9f6e",
+  "#dc6b19",
+  "#b83ad8",
+  "#d9486f",
+  "#0f766e",
+  "#7c3aed",
+  "#2563eb",
+];
 const avatarLetter = computed(() => {
-  const first = (name.value || email.value || '?').trim().charAt(0)
-  return first ? first.toUpperCase() : '?'
-})
+  const first = (name.value || email.value || "?").trim().charAt(0);
+  return first ? first.toUpperCase() : "?";
+});
 
 const avatarStyle = computed(() => {
-  const seed = (name.value || email.value || '?').trim()
-  let hash = 0
+  const seed = (name.value || email.value || "?").trim();
+  let hash = 0;
   for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash << 5) - hash + seed.charCodeAt(i)
-    hash |= 0
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
   }
-  return { backgroundColor: avatarPalette[Math.abs(hash) % avatarPalette.length] }
-})
+  return {
+    backgroundColor: avatarPalette[Math.abs(hash) % avatarPalette.length],
+  };
+});
 
 function isAuthExpiredError(e) {
-  const status = e?.status
-  if (status !== 401 && status !== 403) return false
-  const msg = String(e?.message || '').toLowerCase()
+  const status = e?.status;
+  if (status !== 401 && status !== 403) return false;
+  const msg = String(e?.message || "").toLowerCase();
   return (
-    msg.includes('token') ||
-    msg.includes('expired') ||
-    msg.includes('unauthorized') ||
-    msg.includes('forbidden') ||
-    msg.includes('登录') ||
-    msg.includes('过期')
-  )
+    msg.includes("token") ||
+    msg.includes("expired") ||
+    msg.includes("unauthorized") ||
+    msg.includes("forbidden") ||
+    msg.includes("登录") ||
+    msg.includes("过期")
+  );
 }
 
 function syncUserState(user) {
-  name.value = user?.name ?? ''
-  originalName.value = (user?.name ?? '').trim()
-  editName.value = name.value
-  email.value = user?.email ?? ''
-  role.value = user?.role ?? ''
-  if (user) auth.setUser(user)
+  name.value = user?.name ?? "";
+  originalName.value = (user?.name ?? "").trim();
+  editName.value = name.value;
+  email.value = user?.email ?? "";
+  role.value = user?.role ?? "";
+  if (user) auth.setUser(user);
 }
 
 async function load() {
-  error.value = ''
-  ok.value = ''
-  loading.value = true
+  error.value = "";
+  ok.value = "";
+  loading.value = true;
   try {
-    const me = await api.getMe()
-    syncUserState(me.user)
+    const me = await api.getMe();
+    syncUserState(me.user);
   } catch (e) {
-    error.value = isAuthExpiredError(e) ? 'Login expired. Please sign in again.' : e?.message || 'Failed to load'
-    syncUserState(auth.user)
+    error.value = isAuthExpiredError(e)
+      ? "Login expired. Please sign in again."
+      : e?.message || "Failed to load";
+    syncUserState(auth.user);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 function showOkMessage(message, duration = 1600) {
-  ok.value = message
-  if (okTimer.value) clearTimeout(okTimer.value)
+  ok.value = message;
+  if (okTimer.value) clearTimeout(okTimer.value);
   okTimer.value = setTimeout(() => {
-    ok.value = ''
-    okTimer.value = null
-  }, duration)
+    ok.value = "";
+    okTimer.value = null;
+  }, duration);
 }
 
 function showPwdOkMessage(message) {
-  pwdOk.value = message
-  showOkMessage(message, 2500)
-  if (pwdOkTimer.value) clearTimeout(pwdOkTimer.value)
+  pwdOk.value = message;
+  showOkMessage(message, 2500);
+  if (pwdOkTimer.value) clearTimeout(pwdOkTimer.value);
   pwdOkTimer.value = setTimeout(() => {
-    pwdOk.value = ''
-    pwdOkTimer.value = null
-  }, 2500)
+    pwdOk.value = "";
+    pwdOkTimer.value = null;
+  }, 2500);
 }
 
 function openEdit() {
-  editName.value = name.value
-  error.value = ''
-  editOpen.value = true
+  editName.value = name.value;
+  error.value = "";
+  editOpen.value = true;
 }
 
 function closeEdit() {
-  if (saving.value) return
-  editOpen.value = false
+  if (saving.value) return;
+  editOpen.value = false;
 }
 
 async function onSave() {
-  error.value = ''
-  ok.value = ''
-  const trimmedName = editName.value.trim()
+  error.value = "";
+  ok.value = "";
+  const trimmedName = editName.value.trim();
   if (!trimmedName) {
-    error.value = 'Name cannot be empty.'
-    return
+    error.value = "Name cannot be empty.";
+    return;
   }
   if (trimmedName === originalName.value) {
-    showOkMessage('No changes to save.')
-    editOpen.value = false
-    return
+    showOkMessage("No changes to save.");
+    editOpen.value = false;
+    return;
   }
 
-  saving.value = true
+  saving.value = true;
   try {
-    const me = await api.updateMe({ name: trimmedName })
-    syncUserState(me.user ?? { ...auth.user, name: trimmedName })
-    editOpen.value = false
-    showOkMessage('Updated successfully.')
+    const me = await api.updateMe({ name: trimmedName });
+    syncUserState(me.user ?? { ...auth.user, name: trimmedName });
+    editOpen.value = false;
+    showOkMessage("Updated successfully.");
   } catch (e) {
-    error.value = isAuthExpiredError(e) ? 'Login expired. Please sign in again.' : e?.message || 'Failed to save'
+    error.value = isAuthExpiredError(e)
+      ? "Login expired. Please sign in again."
+      : e?.message || "Failed to save";
   } finally {
-    saving.value = false
+    saving.value = false;
   }
 }
 
 function togglePasswordForm() {
-  showPasswordForm.value = !showPasswordForm.value
-  pwdError.value = ''
-  pwdOk.value = ''
+  showPasswordForm.value = !showPasswordForm.value;
+  pwdError.value = "";
+  pwdOk.value = "";
   if (!showPasswordForm.value) {
-    showCurrentPassword.value = false
-    showNewPassword.value = false
-    showConfirmPassword.value = false
-    currentPassword.value = ''
-    newPassword.value = ''
-    confirmPassword.value = ''
+    showCurrentPassword.value = false;
+    showNewPassword.value = false;
+    showConfirmPassword.value = false;
+    currentPassword.value = "";
+    newPassword.value = "";
+    confirmPassword.value = "";
   }
 }
 
 function stripPasswordWhitespace(field) {
-  field.value = String(field.value || '').replace(/\s+/g, '')
+  field.value = String(field.value || "").replace(/\s+/g, "");
 }
 
 function blockWhitespaceInput(event) {
-  const text = event?.data ?? ''
-  if (/\s/.test(text)) event.preventDefault()
+  const text = event?.data ?? "";
+  if (/\s/.test(text)) event.preventDefault();
 }
 
 function onPasswordPaste(event, field) {
-  event.preventDefault()
-  const pasted = String(event.clipboardData?.getData('text') || '').replace(/\s+/g, '')
-  const current = String(field.value || '')
-  const target = event.target
-  const start = typeof target?.selectionStart === 'number' ? target.selectionStart : current.length
-  const end = typeof target?.selectionEnd === 'number' ? target.selectionEnd : start
-  field.value = `${current.slice(0, start)}${pasted}${current.slice(end)}`
+  event.preventDefault();
+  const pasted = String(event.clipboardData?.getData("text") || "").replace(
+    /\s+/g,
+    "",
+  );
+  const current = String(field.value || "");
+  const target = event.target;
+  const start =
+    typeof target?.selectionStart === "number"
+      ? target.selectionStart
+      : current.length;
+  const end =
+    typeof target?.selectionEnd === "number" ? target.selectionEnd : start;
+  field.value = `${current.slice(0, start)}${pasted}${current.slice(end)}`;
 }
 
 function onCurrentPasswordInput() {
-  stripPasswordWhitespace(currentPassword)
-  if (pwdError.value) pwdError.value = ''
+  stripPasswordWhitespace(currentPassword);
+  if (pwdError.value) pwdError.value = "";
 }
 
 function onNewPasswordInput() {
-  stripPasswordWhitespace(newPassword)
-  if (pwdError.value === 'New password must be at least 8 characters.') {
-    pwdError.value = ''
+  stripPasswordWhitespace(newPassword);
+  if (pwdError.value === "New password must be at least 8 characters.") {
+    pwdError.value = "";
   }
 }
 
 function onNewPasswordBlur() {
-  const next = newPassword.value.trim()
-  if (!next) return
+  const next = newPassword.value.trim();
+  if (!next) return;
   if (next.length < 8) {
-    pwdError.value = 'New password must be at least 8 characters.'
+    pwdError.value = "New password must be at least 8 characters.";
   }
 }
 
 async function onCurrentPasswordBlur() {
-  const current = currentPassword.value.trim()
-  if (!current) return
+  const current = currentPassword.value.trim();
+  if (!current) return;
   try {
     await api.verifyMyPassword({
       currentPassword: current,
-      oldPassword: current
-    })
+      oldPassword: current,
+    });
   } catch (e) {
-    pwdError.value = isAuthExpiredError(e) ? 'Login expired. Please sign in again.' : e?.message || 'Old password is incorrect'
+    pwdError.value = isAuthExpiredError(e)
+      ? "Login expired. Please sign in again."
+      : e?.message || "Old password is incorrect";
   }
 }
 
 function onConfirmPasswordFocus() {
   if (!newPassword.value.trim()) {
-    pwdError.value = 'Please enter new password first.'
+    pwdError.value = "Please enter new password first.";
   }
 }
-
 async function onChangePassword() {
-  ok.value = ''
-  pwdError.value = ''
-  pwdOk.value = ''
-  const current = currentPassword.value.trim()
-  const next = newPassword.value.trim()
-  const confirm = confirmPassword.value.trim()
+  ok.value = "";
+  pwdError.value = "";
+  pwdOk.value = "";
+  const current = currentPassword.value.trim();
+  const next = newPassword.value.trim();
+  const confirm = confirmPassword.value.trim();
 
   if (!current) {
-    pwdError.value = 'Please enter current password.'
-    return
+    pwdError.value = "Please enter current password.";
+    return;
   }
   if (!next) {
-    pwdError.value = 'Please enter new password.'
-    return
+    pwdError.value = "Please enter new password.";
+    return;
   }
   if (next.length < 8) {
-    pwdError.value = 'New password must be at least 8 characters.'
-    return
+    pwdError.value = "New password must be at least 8 characters.";
+    return;
   }
   if (!confirm) {
-    pwdError.value = 'Please confirm new password.'
-    return
+    pwdError.value = "Please confirm new password.";
+    return;
   }
   if (next !== confirm) {
-    pwdError.value = 'New password and confirmation do not match.'
-    return
+    pwdError.value = "New password and confirmation do not match.";
+    return;
   }
 
-  pwdSaving.value = true
+  pwdSaving.value = true;
   try {
     await api.changeMyPassword({
       currentPassword: current,
       oldPassword: current,
       newPassword: next,
-      confirmPassword: confirm
-    })
-    currentPassword.value = ''
-    newPassword.value = ''
-    confirmPassword.value = ''
-    showPasswordForm.value = false
-    showPwdOkMessage('Password updated successfully.')
+      confirmPassword: confirm,
+    });
+    currentPassword.value = "";
+    newPassword.value = "";
+    confirmPassword.value = "";
+    showPasswordForm.value = false;
+    showPwdOkMessage("Password updated successfully.");
   } catch (e) {
-    pwdError.value = isAuthExpiredError(e) ? 'Login expired. Please sign in again.' : e?.message || 'Failed to change password'
+    pwdError.value = isAuthExpiredError(e)
+      ? "Login expired. Please sign in again."
+      : e?.message || "Failed to change password";
   } finally {
-    pwdSaving.value = false
+    pwdSaving.value = false;
   }
 }
 
-onMounted(load)
+onMounted(load);
 
 onBeforeUnmount(() => {
-  if (okTimer.value) clearTimeout(okTimer.value)
-  if (pwdOkTimer.value) clearTimeout(pwdOkTimer.value)
-})
+  if (okTimer.value) clearTimeout(okTimer.value);
+  if (pwdOkTimer.value) clearTimeout(pwdOkTimer.value);
+});
 </script>
 
 <template>
   <section class="page">
     <header class="page__header">
       <h1>Profile</h1>
-      <p class="subtitle">Manage your basic account information and account security.</p>
+      <p class="subtitle">
+        Manage your basic account information and account security.
+      </p>
     </header>
 
-    <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
+    <div v-if="error" class="banner banner--error" role="alert">
+      {{ error }}
+    </div>
     <div v-if="ok" class="banner banner--ok">{{ ok }}</div>
 
     <div class="card">
@@ -286,26 +314,32 @@ onBeforeUnmount(() => {
         <div class="profile-head">
           <div class="avatar" :style="avatarStyle">{{ avatarLetter }}</div>
           <div class="profile-head__meta">
-            <p class="profile-head__name">{{ name || 'User' }}</p>
-            <p class="muted small">{{ email || 'No email' }}</p>
+            <p class="profile-head__name">{{ name || "User" }}</p>
+            <p class="muted small">{{ email || "No email" }}</p>
           </div>
         </div>
 
         <div class="card-main">
           <dl class="kv">
             <dt>Name</dt>
-            <dd>{{ name || '—' }}</dd>
+            <dd>{{ name || "—" }}</dd>
             <dt>Email</dt>
-            <dd>{{ email || '—' }}</dd>
+            <dd>{{ email || "—" }}</dd>
             <dt>Role</dt>
-            <dd>{{ role || '—' }}</dd>
+            <dd>{{ role || "—" }}</dd>
           </dl>
           <div class="card-action">
             <button type="button" class="btn" @click="openEdit">
               Edit Profile
             </button>
-            <button type="button" class="btn btn--ghost" @click="togglePasswordForm">
-              {{ showPasswordForm ? 'Cancel Password Change' : 'Change Password' }}
+            <button
+              type="button"
+              class="btn btn--ghost"
+              @click="togglePasswordForm"
+            >
+              {{
+                showPasswordForm ? "Cancel Password Change" : "Change Password"
+              }}
             </button>
           </div>
         </div>
@@ -328,10 +362,14 @@ onBeforeUnmount(() => {
               <button
                 type="button"
                 class="password-toggle"
-                :aria-label="showCurrentPassword ? 'Hide current password' : 'Show current password'"
+                :aria-label="
+                  showCurrentPassword
+                    ? 'Hide current password'
+                    : 'Show current password'
+                "
                 @click="showCurrentPassword = !showCurrentPassword"
               >
-                {{ showCurrentPassword ? 'Hide' : 'Show' }}
+                {{ showCurrentPassword ? "Hide" : "Show" }}
               </button>
             </div>
           </label>
@@ -353,10 +391,12 @@ onBeforeUnmount(() => {
               <button
                 type="button"
                 class="password-toggle"
-                :aria-label="showNewPassword ? 'Hide new password' : 'Show new password'"
+                :aria-label="
+                  showNewPassword ? 'Hide new password' : 'Show new password'
+                "
                 @click="showNewPassword = !showNewPassword"
               >
-                {{ showNewPassword ? 'Hide' : 'Show' }}
+                {{ showNewPassword ? "Hide" : "Show" }}
               </button>
             </div>
           </label>
@@ -378,19 +418,30 @@ onBeforeUnmount(() => {
               <button
                 type="button"
                 class="password-toggle"
-                :aria-label="showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'"
+                :aria-label="
+                  showConfirmPassword
+                    ? 'Hide confirm password'
+                    : 'Show confirm password'
+                "
                 @click="showConfirmPassword = !showConfirmPassword"
               >
-                {{ showConfirmPassword ? 'Hide' : 'Show' }}
+                {{ showConfirmPassword ? "Hide" : "Show" }}
               </button>
             </div>
           </label>
 
-          <div v-if="pwdError" class="banner banner--error" role="alert">{{ pwdError }}</div>
+          <div v-if="pwdError" class="banner banner--error" role="alert">
+            {{ pwdError }}
+          </div>
           <div v-if="pwdOk" class="banner banner--ok">{{ pwdOk }}</div>
 
-          <button type="button" class="btn" :disabled="pwdSaving" @click="onChangePassword">
-            {{ pwdSaving ? 'Submitting...' : 'Confirm Password Change' }}
+          <button
+            type="button"
+            class="btn"
+            :disabled="pwdSaving"
+            @click="onChangePassword"
+          >
+            {{ pwdSaving ? "Submitting..." : "Confirm Password Change" }}
           </button>
         </div>
       </template>
@@ -401,12 +452,25 @@ onBeforeUnmount(() => {
         <h3 class="modal-title">Edit Profile</h3>
         <label class="field">
           <span class="label">Name</span>
-          <input v-model="editName" class="input" type="text" maxlength="50" autocomplete="name" />
+          <input
+            v-model="editName"
+            class="input"
+            type="text"
+            maxlength="50"
+            autocomplete="name"
+          />
         </label>
         <div class="modal-footer">
-          <button type="button" class="btn btn--ghost" :disabled="saving" @click="closeEdit">Cancel</button>
+          <button
+            type="button"
+            class="btn btn--ghost"
+            :disabled="saving"
+            @click="closeEdit"
+          >
+            Cancel
+          </button>
           <button type="button" class="btn" :disabled="saving" @click="onSave">
-            {{ saving ? 'Saving...' : 'Save' }}
+            {{ saving ? "Saving..." : "Save" }}
           </button>
         </div>
       </section>

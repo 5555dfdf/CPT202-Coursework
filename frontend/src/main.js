@@ -6,6 +6,7 @@ import App from './App.vue'
 import { createPinia } from 'pinia'
 import { router } from './router/index.js'
 
+// bootstrap app then register global plugins before mount
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)

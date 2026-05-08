@@ -21,7 +21,6 @@ const passwordError = ref("");
 
 const PASSWORD_VALIDATION_MESSAGE =
   "Password must be 8-20 characters and include uppercase, lowercase, and a number.";
-
 const passwordRules = computed(() => [
   {
     key: "length",
@@ -46,11 +45,11 @@ const passwordRules = computed(() => [
 ]);
 
 const isPasswordValid = computed(() =>
-  passwordRules.value.every((rule) => rule.passed)
+  passwordRules.value.every((rule) => rule.passed),
 );
 
 const showPasswordHelper = computed(
-  () => passwordFocused.value && passwordInteracted.value
+  () => passwordFocused.value && passwordInteracted.value,
 );
 
 function onPasswordFocus() {
@@ -83,7 +82,6 @@ watch(password, () => {
     passwordError.value = "";
   }
 });
-
 async function onSendCode() {
   if (!email.value || sendingCode.value || codeCountdown.value > 0) return;
   error.value = "";
@@ -108,7 +106,6 @@ async function onSendCode() {
     sendingCode.value = false;
   }
 }
-
 async function onSubmit() {
   error.value = "";
   if (!ensurePasswordValid()) return;
@@ -222,7 +219,9 @@ async function onSubmit() {
                 </li>
               </ul>
             </div>
-            <div v-if="passwordError" class="password-error">{{ passwordError }}</div>
+            <div v-if="passwordError" class="password-error">
+              {{ passwordError }}
+            </div>
           </label>
 
           <div v-if="error" class="error">{{ error }}</div>

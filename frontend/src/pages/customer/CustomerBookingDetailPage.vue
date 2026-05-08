@@ -1,117 +1,117 @@
 ﻿<script setup>
-import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { api } from '@/api/client'
-import { showAlertModal } from '@/ui/alertModal'
+import { computed, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import { api } from "@/api/client";
+import { showAlertModal } from "@/ui/alertModal";
 
 const props = defineProps({
   id: { type: String, required: true },
-  embedded: { type: Boolean, default: false }
-})
-const emit = defineEmits(['close'])
+  embedded: { type: Boolean, default: false },
+});
+const emit = defineEmits(["close"]);
 
-const router = useRouter()
-const booking = ref(null)
-const loading = ref(false)
-const error = ref('')
-const cancelReason = ref('')
-const busy = ref('')
-const actionError = ref('')
-const reasonFocused = ref(false)
-const reasonLimitError = ref('')
+const router = useRouter();
+const booking = ref(null);
+const loading = ref(false);
+const error = ref("");
+const cancelReason = ref("");
+const busy = ref("");
+const actionError = ref("");
+const reasonFocused = ref(false);
+const reasonLimitError = ref("");
 
-const REASON_MAX = 300
-const showReasonHelper = computed(() => reasonFocused.value || !!reasonLimitError.value)
+const REASON_MAX = 300;
+const showReasonHelper = computed(
+  () => reasonFocused.value || !!reasonLimitError.value,
+);
 
 function formatMoney(amount, currency) {
-  const n = Number(amount ?? 0)
-  const safe = Number.isNaN(n) ? 0 : n
-  const c = String(currency ?? 'CNY').trim() || 'CNY'
-  return `${safe.toFixed(2)} ${c}`
+  const n = Number(amount ?? 0);
+  const safe = Number.isNaN(n) ? 0 : n;
+  const c = String(currency ?? "CNY").trim() || "CNY";
+  return `${safe.toFixed(2)} ${c}`;
 }
-
 async function load() {
-  error.value = ''
-  loading.value = true
-  booking.value = null
+  error.value = "";
+  loading.value = true;
+  booking.value = null;
   try {
-    booking.value = await api.getBooking(props.id)
+    booking.value = await api.getBooking(props.id);
   } catch (e) {
-    error.value = e?.message || 'Failed to load'
+    error.value = e?.message || "Failed to load";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 watch(
   () => props.id,
   () => load(),
-  { immediate: true }
-)
+  { immediate: true },
+);
 
 watch(cancelReason, (val) => {
   if (val.length > REASON_MAX) {
-    cancelReason.value = val.slice(0, REASON_MAX)
-    reasonLimitError.value = `Maximum ${REASON_MAX} characters allowed.`
-    return
+    cancelReason.value = val.slice(0, REASON_MAX);
+    reasonLimitError.value = `Maximum ${REASON_MAX} characters allowed.`;
+    return;
   }
   if (val.length < REASON_MAX) {
-    reasonLimitError.value = ''
+    reasonLimitError.value = "";
   }
-})
-
+});
 async function onCancel() {
-  actionError.value = ''
-  busy.value = 'cancel'
+  actionError.value = "";
+  busy.value = "cancel";
   try {
     booking.value = await api.cancelBooking(props.id, {
-      reason: cancelReason.value.trim() || undefined
-    })
+      reason: cancelReason.value.trim() || undefined,
+    });
     if (props.embedded) {
       showAlertModal({
-        type: 'success',
-        message: 'Booking cancelled successfully.',
-        onClose: () => emit('close', { refresh: true })
-      })
+        type: "success",
+        message: "Booking cancelled successfully.",
+        onClose: () => emit("close", { refresh: true }),
+      });
     } else {
       showAlertModal({
-        type: 'success',
-        message: 'Booking cancelled successfully.',
+        type: "success",
+        message: "Booking cancelled successfully.",
         onClose: () =>
           router.push({
-            name: 'customer.bookings',
-            query: { refresh: String(Date.now()) }
-          })
-      })
+            name: "customer.bookings",
+            query: { refresh: String(Date.now()) },
+          }),
+      });
     }
   } catch (e) {
-    actionError.value = e?.message || 'Failed to cancel'
+    actionError.value = e?.message || "Failed to cancel";
   } finally {
-    busy.value = ''
+    busy.value = "";
   }
 }
 
 function goReschedule() {
-  const specialistId = booking.value?.specialistId
+  const specialistId = booking.value?.specialistId;
   if (!specialistId) {
-    actionError.value = 'Missing specialistId for reschedule'
-    return
+    actionError.value = "Missing specialistId for reschedule";
+    return;
   }
   router.push({
-    name: 'customer.specialistSlots',
+    name: "customer.specialistSlots",
     params: { id: specialistId },
-    query: { bookingId: props.id }
-  })
+    query: { bookingId: props.id },
+  });
 }
 
 function onReasonFocus() {
-  reasonFocused.value = true
+  reasonFocused.value = true;
 }
 
 function onReasonBlur() {
-  reasonFocused.value = false
+  reasonFocused.value = false;
   if (cancelReason.value.length <= REASON_MAX) {
-    reasonLimitError.value = ''
+    reasonLimitError.value = "";
   }
 }
 </script>
@@ -122,7 +122,9 @@ function onReasonBlur() {
       <h1>Booking Details</h1>
     </header>
 
-    <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
+    <div v-if="error" class="banner banner--error" role="alert">
+      {{ error }}
+    </div>
     <div v-else-if="loading" class="card muted">Loading…</div>
 
     <template v-else-if="booking">
@@ -131,21 +133,25 @@ function onReasonBlur() {
           <div class="title">Booking Info</div>
           <dl class="kv">
             <dt>Status</dt>
-            <dd>{{ booking.status ?? '—' }}</dd>
+            <dd>{{ booking.status ?? "—" }}</dd>
             <dt>Time</dt>
-            <dd>{{ booking.time ?? booking.startTime ?? '—' }}</dd>
+            <dd>{{ booking.time ?? booking.startTime ?? "—" }}</dd>
             <dt>Specialist</dt>
-            <dd>{{ booking.specialistName ?? booking.specialistId ?? '—' }}</dd>
+            <dd>{{ booking.specialistName ?? booking.specialistId ?? "—" }}</dd>
             <dt>Duration</dt>
-            <dd>{{ booking.duration ?? booking.slot ?? booking.slotId ?? '—' }}</dd>
+            <dd>
+              {{ booking.duration ?? booking.slot ?? booking.slotId ?? "—" }}
+            </dd>
             <dt>Price</dt>
             <dd>{{ formatMoney(booking.amount, booking.currency) }}</dd>
             <dt>Type</dt>
-            <dd>{{ booking.type ?? '—' }}</dd>
+            <dd>{{ booking.type ?? "—" }}</dd>
             <dt>Detail</dt>
-            <dd class="detail-text" :title="booking.detail ?? '—'">{{ booking.detail ?? '—' }}</dd>
+            <dd class="detail-text" :title="booking.detail ?? '—'">
+              {{ booking.detail ?? "—" }}
+            </dd>
             <dt>Note</dt>
-            <dd>{{ booking.note ?? '—' }}</dd>
+            <dd>{{ booking.note ?? "—" }}</dd>
           </dl>
         </div>
 
@@ -170,8 +176,12 @@ function onReasonBlur() {
               role="status"
               aria-live="polite"
             >
-              <p class="limit-helper__text">{{ reasonLimitError || `Maximum ${REASON_MAX} characters` }}</p>
-              <p class="limit-helper__count">{{ cancelReason.length }}/{{ REASON_MAX }}</p>
+              <p class="limit-helper__text">
+                {{ reasonLimitError || `Maximum ${REASON_MAX} characters` }}
+              </p>
+              <p class="limit-helper__count">
+                {{ cancelReason.length }}/{{ REASON_MAX }}
+              </p>
             </div>
             <div class="cancel-action">
               <button
@@ -180,7 +190,7 @@ function onReasonBlur() {
                 :disabled="busy === 'cancel'"
                 @click="onCancel"
               >
-                {{ busy === 'cancel' ? 'Processing…' : 'Cancel Booking' }}
+                {{ busy === "cancel" ? "Processing…" : "Cancel Booking" }}
               </button>
             </div>
           </div>
@@ -188,22 +198,24 @@ function onReasonBlur() {
           <div class="card card--reschedule">
             <div class="title">Reschedule</div>
             <div class="reschedule-action">
-              <button
-                type="button"
-                class="btn"
-                @click="goReschedule"
-              >
+              <button type="button" class="btn" @click="goReschedule">
                 Choose a new time slot
               </button>
             </div>
           </div>
 
-          <p v-if="actionError" class="banner banner--error">{{ actionError }}</p>
+          <p v-if="actionError" class="banner banner--error">
+            {{ actionError }}
+          </p>
         </div>
       </div>
 
       <p v-if="!embedded" class="muted small">
-        <button type="button" class="linkish btn-neutral" @click="router.push({ name: 'customer.bookings' })">
+        <button
+          type="button"
+          class="linkish btn-neutral"
+          @click="router.push({ name: 'customer.bookings' })"
+        >
           Back to My Bookings
         </button>
       </p>
@@ -340,9 +352,9 @@ function onReasonBlur() {
   white-space: nowrap;
 }
 .btn--danger {
-  border-color: #D9533C;
+  border-color: #d9533c;
   background: #ffffff;
-  color: #D9533C;
+  color: #d9533c;
 }
 .btn:disabled {
   opacity: 0.6;
@@ -418,4 +430,3 @@ function onReasonBlur() {
   }
 }
 </style>
-
