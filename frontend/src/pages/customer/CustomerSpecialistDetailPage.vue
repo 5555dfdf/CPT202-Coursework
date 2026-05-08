@@ -3,7 +3,6 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { formatReferencePrice } from '@/ui/referencePrice'
-
 const props = defineProps({
   id: { type: String, required: true }
 })
@@ -18,7 +17,6 @@ const expertiseLabel = computed(() => {
   if (Array.isArray(ex) && ex.length) return ex.map((e) => e.name ?? e.id).join(', ')
   return '—'
 })
-
 async function loadSpecialist() {
   error.value = ''
   loading.value = true

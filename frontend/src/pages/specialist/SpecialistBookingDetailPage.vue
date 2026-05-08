@@ -3,6 +3,8 @@ import { ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "@/api/client";
 import { showConfirmModal } from "@/ui/confirmModal.js";
+// confirm reject and complete actions
+
 const props = defineProps({
   id: { type: String, required: true },
 });
@@ -13,7 +15,6 @@ const loading = ref(false);
 const error = ref("");
 const rejectReason = ref("");
 const busy = ref("");
-
 function formatPrice(row) {
   const direct = row?.price;
   if (typeof direct === "string" && direct.trim()) return direct.trim();
@@ -22,7 +23,6 @@ function formatPrice(row) {
   const c = String(row?.currency ?? "CNY").trim() || "CNY";
   return `${safe.toFixed(2)} ${c}`;
 }
-
 async function load() {
   error.value = "";
   loading.value = true;
@@ -41,9 +41,7 @@ watch(
   () => load(),
   { immediate: true },
 );
-
 function run(action) {
-  // 根据不同的动作，设置不同的提示文案
   let title = "";
   let message = "";
 
@@ -60,7 +58,6 @@ function run(action) {
       "Once confirmed, the status will change to 'Completed'.";
   }
 
-  // 弹出提示框
   showConfirmModal({
     title: title,
     message: message,

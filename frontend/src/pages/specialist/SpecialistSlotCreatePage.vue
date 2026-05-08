@@ -1,64 +1,68 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { api } from '@/api/client'
-import { showAlertModal } from '@/ui/alertModal'
+import { ref, computed, onMounted } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import { api } from "@/api/client";
+import { showAlertModal } from "@/ui/alertModal";
 
-const router = useRouter()
-const route = useRoute()
-const slotId = route.params.id
-const isEditMode = !!slotId
+const router = useRouter();
+const route = useRoute();
+const slotId = route.params.id;
+const isEditMode = !!slotId;
 
 const createForm = ref({
-  date: new Date().toISOString().split('T')[0],
-  start: '09:00',
-  end: '09:30',
+  date: new Date().toISOString().split("T")[0],
+  start: "09:00",
+  end: "09:30",
   available: true,
-  amount: '0.00',
-  currency: 'CNY',
-  type: 'online',
-  detail: ''
-})
+  amount: "0.00",
+  currency: "CNY",
+  type: "online",
+  detail: "",
+});
 
-const loading = ref(false)
-const createLoading = ref(false)
-const pricingRules = ref([])
-const pricingRulesLoading = ref(false)
-const pricingRulesError = ref('')
-const DETAIL_MAX = 300
-
+const loading = ref(false);
+const createLoading = ref(false);
+const pricingRules = ref([]);
+const pricingRulesLoading = ref(false);
+const pricingRulesError = ref("");
+const DETAIL_MAX = 300;
 const createDurationMinutes = computed(() => {
-  return calcDurationMinutes(createForm.value.start, createForm.value.end)
-})
+  return calcDurationMinutes(createForm.value.start, createForm.value.end);
+});
 
-const pricingRulesPreview = computed(() => pricingRules.value.slice(0, 4))
-const extraPricingRulesCount = computed(() => Math.max(0, pricingRules.value.length - pricingRulesPreview.value.length))
+const pricingRulesPreview = computed(() => pricingRules.value.slice(0, 4));
+const extraPricingRulesCount = computed(() =>
+  Math.max(0, pricingRules.value.length - pricingRulesPreview.value.length),
+);
 
 function calcDurationMinutes(startStr, endStr) {
-  if (!startStr || !endStr) return 0
-  const [startHour, startMin] = startStr.split(':').map(Number)
-  const [endHour, endMin] = endStr.split(':').map(Number)
-  const startTotal = startHour * 60 + startMin
-  const endTotal = endHour * 60 + endMin
-  return Math.max(0, endTotal - startTotal)
+  if (!startStr || !endStr) return 0;
+  const [startHour, startMin] = startStr.split(":").map(Number);
+  const [endHour, endMin] = endStr.split(":").map(Number);
+  const startTotal = startHour * 60 + startMin;
+  const endTotal = endHour * 60 + endMin;
+  return Math.max(0, endTotal - startTotal);
 }
 
 function normalizeAmountInput(value) {
-  if (value === null || value === undefined || value === '') return 0
-  const num = Number(value)
-  return Number.isNaN(num) ? 0 : num
+  if (value === null || value === undefined || value === "") return 0;
+  const num = Number(value);
+  return Number.isNaN(num) ? 0 : num;
 }
 
 function isValidTimeRange(startValue, endValue) {
-  if (!startValue || !endValue) return true
-  return String(startValue) < String(endValue)
+  if (!startValue || !endValue) return true;
+  return String(startValue) < String(endValue);
 }
 
-function formatCurrency(amountValue, currencyValue = 'CNY') {
-  const amount = Number(amountValue)
-  const currency = String(currencyValue || 'CNY').trim().toUpperCase() || 'CNY'
-  if (!Number.isFinite(amount)) return '--'
-  return `${amount.toFixed(2)} ${currency}`
+function formatCurrency(amountValue, currencyValue = "CNY") {
+  const amount = Number(amountValue);
+  const currency =
+    String(currencyValue || "CNY")
+      .trim()
+      .toUpperCase() || "CNY";
+  if (!Number.isFinite(amount)) return "--";
+  return `${amount.toFixed(2)} ${currency}`;
 }
 
 function buildSlotPayload(form) {
@@ -68,113 +72,148 @@ function buildSlotPayload(form) {
     end: form.end,
     available: form.available,
     amount: normalizeAmountInput(form.amount),
-    currency: String(form.currency ?? '').trim() || 'CNY',
+    currency: String(form.currency ?? "").trim() || "CNY",
     duration: calcDurationMinutes(form.start, form.end),
-    type: String(form.type ?? '').trim() || 'online',
-    detail: String(form.detail ?? '').trim()
-  }
+    type: String(form.type ?? "").trim() || "online",
+    detail: String(form.detail ?? "").trim(),
+  };
 }
 
 async function loadPricingRules() {
-  pricingRulesLoading.value = true
-  pricingRulesError.value = ''
+  pricingRulesLoading.value = true;
+  pricingRulesError.value = "";
   try {
-    const rows = await api.specialistListPricingRules()
-    pricingRules.value = Array.isArray(rows) ? rows : []
+    const rows = await api.specialistListPricingRules();
+    pricingRules.value = Array.isArray(rows) ? rows : [];
   } catch (e) {
-    pricingRules.value = []
-    pricingRulesError.value = e?.message || 'Failed to load your pricing rules.'
+    pricingRules.value = [];
+    pricingRulesError.value =
+      e?.message || "Failed to load your pricing rules.";
   } finally {
-    pricingRulesLoading.value = false
+    pricingRulesLoading.value = false;
   }
 }
 
 async function loadSlotDetails() {
-  if (!slotId) return
-  loading.value = true
+  if (!slotId) return;
+  loading.value = true;
   try {
-    const slot = await api.specialistGetSlot(slotId)
+    const slot = await api.specialistGetSlot(slotId);
     if (slot) {
       createForm.value = {
         date: slot.date || createForm.value.date,
         start: slot.start || createForm.value.start,
         end: slot.end || createForm.value.end,
         available: slot.available ?? true,
-        amount: slot.amount?.toString() || '0.00',
-        currency: slot.currency || 'CNY',
-        type: slot.type || 'online',
-        detail: slot.detail || ''
-      }
+        amount: slot.amount?.toString() || "0.00",
+        currency: slot.currency || "CNY",
+        type: slot.type || "online",
+        detail: slot.detail || "",
+      };
     }
   } catch (e) {
-    showAlertModal({ type: 'error', message: e?.message || 'Failed to load slot details' })
+    showAlertModal({
+      type: "error",
+      message: e?.message || "Failed to load slot details",
+    });
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 async function onCreate() {
-  if (!createForm.value.date || !createForm.value.start || !createForm.value.end) {
-    showAlertModal({ type: 'error', message: 'Please complete date, start time, and end time.' })
-    return
+  if (
+    !createForm.value.date ||
+    !createForm.value.start ||
+    !createForm.value.end
+  ) {
+    showAlertModal({
+      type: "error",
+      message: "Please complete date, start time, and end time.",
+    });
+    return;
   }
   if (!isValidTimeRange(createForm.value.start, createForm.value.end)) {
-    showAlertModal({ type: 'error', message: 'Start time must be earlier than end time.' })
-    return
+    showAlertModal({
+      type: "error",
+      message: "Start time must be earlier than end time.",
+    });
+    return;
   }
   if (createDurationMinutes.value <= 0) {
-    showAlertModal({ type: 'error', message: 'Please enter a valid duration in minutes.' })
-    return
+    showAlertModal({
+      type: "error",
+      message: "Please enter a valid duration in minutes.",
+    });
+    return;
   }
 
-  createLoading.value = true
+  createLoading.value = true;
   try {
     if (isEditMode) {
-      await api.specialistUpdateSlot(slotId, buildSlotPayload(createForm.value))
-      showAlertModal({ type: 'success', message: 'Slot updated successfully.' })
+      await api.specialistUpdateSlot(
+        slotId,
+        buildSlotPayload(createForm.value),
+      );
+      showAlertModal({
+        type: "success",
+        message: "Slot updated successfully.",
+      });
     } else {
-      await api.specialistCreateSlot(buildSlotPayload(createForm.value))
-      showAlertModal({ type: 'success', message: 'Slot created successfully.' })
+      await api.specialistCreateSlot(buildSlotPayload(createForm.value));
+      showAlertModal({
+        type: "success",
+        message: "Slot created successfully.",
+      });
     }
-    await router.push({ name: 'specialist.slots' })
+    await router.push({ name: "specialist.slots" });
   } catch (e) {
-    showAlertModal({ type: 'error', message: e?.message || 'Failed to save slot' })
+    showAlertModal({
+      type: "error",
+      message: e?.message || "Failed to save slot",
+    });
   } finally {
-    createLoading.value = false
+    createLoading.value = false;
   }
 }
 
 function resetForm() {
   createForm.value = {
-    date: new Date().toISOString().split('T')[0],
-    start: '09:00',
-    end: '09:30',
+    date: new Date().toISOString().split("T")[0],
+    start: "09:00",
+    end: "09:30",
     available: true,
-    amount: '0.00',
-    currency: 'CNY',
-    type: 'online',
-    detail: ''
-  }
+    amount: "0.00",
+    currency: "CNY",
+    type: "online",
+    detail: "",
+  };
 }
 
 function goBack() {
-  router.push({ name: 'specialist.slots' })
+  router.push({ name: "specialist.slots" });
 }
 
 onMounted(async () => {
-  await loadPricingRules()
+  await loadPricingRules();
   if (isEditMode) {
-    await loadSlotDetails()
+    await loadSlotDetails();
   }
-})
+});
 </script>
 
 <template>
   <section class="page">
     <header class="page__header">
       <div>
-        <h1>{{ isEditMode ? 'Edit Slot' : 'Create Slot' }}</h1>
-        <p class="subtitle">{{ isEditMode ? 'Edit an existing consultation slot.' : 'Create consultation slots for your availability.' }}</p>
+        <h1>{{ isEditMode ? "Edit Slot" : "Create Slot" }}</h1>
+        <p class="subtitle">
+          {{
+            isEditMode
+              ? "Edit an existing consultation slot."
+              : "Create consultation slots for your availability."
+          }}
+        </p>
       </div>
       <button type="button" class="btn-neutral" @click="goBack">
         Back to Slot Management
@@ -190,10 +229,10 @@ onMounted(async () => {
         <div class="field-grid field-grid--two">
           <label class="field">
             <span class="label">Date</span>
-            <input 
-              v-model="createForm.date" 
-              type="date" 
-              class="input" 
+            <input
+              v-model="createForm.date"
+              type="date"
+              class="input"
               :disabled="createLoading"
             />
           </label>
@@ -213,7 +252,9 @@ onMounted(async () => {
               <button
                 type="button"
                 class="option-btn option-btn--type"
-                :class="{ 'option-btn--active': createForm.available === false }"
+                :class="{
+                  'option-btn--active': createForm.available === false,
+                }"
                 @click="createForm.available = false"
                 :disabled="createLoading"
               >
@@ -226,20 +267,20 @@ onMounted(async () => {
         <div class="field-grid field-grid--two">
           <label class="field">
             <span class="label">Start Time</span>
-            <input 
-              v-model="createForm.start" 
-              type="time" 
-              class="input" 
+            <input
+              v-model="createForm.start"
+              type="time"
+              class="input"
               :disabled="createLoading"
             />
           </label>
 
           <label class="field">
             <span class="label">End Time</span>
-            <input 
-              v-model="createForm.end" 
-              type="time" 
-              class="input" 
+            <input
+              v-model="createForm.end"
+              type="time"
+              class="input"
               :disabled="createLoading"
             />
           </label>
@@ -247,23 +288,22 @@ onMounted(async () => {
 
         <div class="field-grid field-grid--two">
           <label class="field">
-            <span class="label">Amount
-            </span>
-            <input 
-              v-model="createForm.amount" 
-              type="number" 
-              step="0.01" 
-              min="0" 
-              class="input" 
+            <span class="label">Amount </span>
+            <input
+              v-model="createForm.amount"
+              type="number"
+              step="0.01"
+              min="0"
+              class="input"
               :disabled="createLoading"
             />
           </label>
 
           <label class="field">
             <span class="label">Currency</span>
-            <select 
-              v-model="createForm.currency" 
-              class="input input--select" 
+            <select
+              v-model="createForm.currency"
+              class="input input--select"
               :disabled="createLoading"
             >
               <option value="CNY">CNY</option>
@@ -276,19 +316,19 @@ onMounted(async () => {
         <div class="field-grid field-grid--two">
           <label class="field">
             <span class="label">Duration (minutes, auto)</span>
-            <input 
-              :value="createDurationMinutes" 
-              type="number" 
-              class="input" 
-              readonly 
+            <input
+              :value="createDurationMinutes"
+              type="number"
+              class="input"
+              readonly
             />
           </label>
 
           <label class="field">
             <span class="label">Type</span>
-            <select 
-              v-model="createForm.type" 
-              class="input input--select" 
+            <select
+              v-model="createForm.type"
+              class="input input--select"
               :disabled="createLoading"
             >
               <option value="online">Online</option>
@@ -299,14 +339,16 @@ onMounted(async () => {
 
         <label class="field">
           <span class="label">Detail</span>
-          <textarea 
-            v-model="createForm.detail" 
-            class="input input--textarea" 
-            rows="3" 
+          <textarea
+            v-model="createForm.detail"
+            class="input input--textarea"
+            rows="3"
             maxlength="300"
             :disabled="createLoading"
           ></textarea>
-          <p class="detail-count">{{ (createForm.detail || '').length }}/{{ DETAIL_MAX }}</p>
+          <p class="detail-count">
+            {{ (createForm.detail || "").length }}/{{ DETAIL_MAX }}
+          </p>
         </label>
 
         <div class="form-actions">
@@ -317,35 +359,48 @@ onMounted(async () => {
                 Loading your pricing rules...
               </template>
               <template v-else-if="pricingRules.length">
-                <div class="tooltip-title"> Please follow your recommended Price!<br>
-                  Otherwise you will be punished!</div>
-                <div v-for="rule in pricingRulesPreview" :key="rule.id" class="tooltip-rule">
-                  {{ rule.duration }} min {{ rule.type }}: {{ formatCurrency(rule.amount, rule.currency) }}
+                <div class="tooltip-title">
+                  Please follow your recommended Price!<br />
+                  Otherwise you will be punished!
+                </div>
+                <div
+                  v-for="rule in pricingRulesPreview"
+                  :key="rule.id"
+                  class="tooltip-rule"
+                >
+                  {{ rule.duration }} min {{ rule.type }}:
+                  {{ formatCurrency(rule.amount, rule.currency) }}
                 </div>
                 <div v-if="extraPricingRulesCount" class="tooltip-more">
                   +{{ extraPricingRulesCount }} more rules
                 </div>
               </template>
               <template v-else>
-                {{ pricingRulesError || 'No pricing rules found.' }}
+                {{ pricingRulesError || "No pricing rules found." }}
               </template>
             </div>
           </div>
-          <button 
-            type="button" 
-            class="btn-secondary" 
+          <button
+            type="button"
+            class="btn-secondary"
             @click="resetForm"
             :disabled="createLoading"
           >
             Reset
           </button>
-          <button 
-            type="button" 
-            class="btn-primary" 
+          <button
+            type="button"
+            class="btn-primary"
             @click="onCreate"
             :disabled="createLoading"
           >
-            {{ createLoading ? 'Saving...' : (isEditMode ? 'Update Slot' : 'Create Slot') }}
+            {{
+              createLoading
+                ? "Saving..."
+                : isEditMode
+                  ? "Update Slot"
+                  : "Create Slot"
+            }}
           </button>
         </div>
       </div>
@@ -362,7 +417,6 @@ onMounted(async () => {
   margin-top: 12px;
 }
 
-/* 感叹号 */
 .icon {
   width: 18px;
   height: 18px;
@@ -375,13 +429,12 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-
 }
 
-/* tooltip 本体 */
+
 .tooltip {
   position: absolute;
-  bottom: 130%; /* 在上方 */
+  bottom: 130%; 
   left: 50%;
   transform: translateX(-50%);
   width: 280px;
@@ -399,7 +452,7 @@ onMounted(async () => {
   transition: opacity 0.2s ease;
 }
 
-/* hover 显示 */
+
 .tooltip-title {
   margin-bottom: 6px;
   font-weight: 700;
@@ -525,7 +578,10 @@ onMounted(async () => {
   color: #374151;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
 }
 
 .option-btn--type {

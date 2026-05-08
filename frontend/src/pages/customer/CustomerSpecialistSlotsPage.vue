@@ -1,96 +1,100 @@
 ﻿<script setup>
-import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { api } from '@/api/client'
-import { showAlertModal } from '@/ui/alertModal'
+import { computed, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import { api } from "@/api/client";
+import { showAlertModal } from "@/ui/alertModal";
 
 const props = defineProps({
   id: { type: String, required: true },
-  bookingId: { type: String, default: '' }
-})
-const router = useRouter()
+  bookingId: { type: String, default: "" },
+});
+const router = useRouter();
 
-const isReschedule = computed(() => !!props.bookingId)
+const isReschedule = computed(() => !!props.bookingId);
 
-const slots = ref([])
-const slotDate = ref(new Date().toISOString().slice(0, 10))
-const selectedSlotId = ref('')
-const loading = ref(false)
-const error = ref('')
-const note = ref('')
-const submitting = ref(false)
-const previewLoading = ref(false)
-const previewError = ref('')
-const weeklyPreview = ref([])
-const previewOpen = ref(false)
-const todayDate = new Date().toISOString().slice(0, 10)
-const paymentModalOpen = ref(false)
-const paymentBusy = ref(false)
-const paymentError = ref('')
+const slots = ref([]);
+const slotDate = ref(new Date().toISOString().slice(0, 10));
+const selectedSlotId = ref("");
+const loading = ref(false);
+const error = ref("");
+const note = ref("");
+const submitting = ref(false);
+const previewLoading = ref(false);
+const previewError = ref("");
+const weeklyPreview = ref([]);
+const previewOpen = ref(false);
+const todayDate = new Date().toISOString().slice(0, 10);
+const paymentModalOpen = ref(false);
+const paymentBusy = ref(false);
+const paymentError = ref("");
 const paymentContext = ref({
-  paymentIntentId: '',
-  paymentId: '',
-  specialistId: '',
-  slotId: '',
-  note: '',
+  paymentIntentId: "",
+  paymentId: "",
+  specialistId: "",
+  slotId: "",
+  note: "",
   amount: 0,
-  currency: 'CNY',
-  slotLabel: '--',
-  qrCodeUrl: '',
-  mockMode: false
-})
+  currency: "CNY",
+  slotLabel: "--",
+  qrCodeUrl: "",
+  mockMode: false,
+});
 
 function formatSlotTime(value) {
-  const raw = String(value ?? '').trim()
-  if (!raw) return '--'
+  const raw = String(value ?? "").trim();
+  if (!raw) return "--";
 
-  const timeMatch = raw.match(/T?(\d{2}:\d{2})/)
-  if (timeMatch) return timeMatch[1]
+  const timeMatch = raw.match(/T?(\d{2}:\d{2})/);
+  if (timeMatch) return timeMatch[1];
 
-  return raw
+  return raw;
 }
 
 function formatSlotRange(slot) {
-  return `${formatSlotTime(slot?.start ?? slot?.startTime)} - ${formatSlotTime(slot?.end ?? slot?.endTime)}`
+  return `${formatSlotTime(slot?.start ?? slot?.startTime)} - ${formatSlotTime(slot?.end ?? slot?.endTime)}`;
 }
 
 function formatMoney(slot) {
-  const amount = Number(slot?.amount ?? 0)
-  const safeAmount = Number.isNaN(amount) ? 0 : amount
-  const currency = String(slot?.currency ?? 'CNY').trim() || 'CNY'
-  return `${safeAmount.toFixed(2)} ${currency}`
+  const amount = Number(slot?.amount ?? 0);
+  const safeAmount = Number.isNaN(amount) ? 0 : amount;
+  const currency = String(slot?.currency ?? "CNY").trim() || "CNY";
+  return `${safeAmount.toFixed(2)} ${currency}`;
 }
 
 function formatSession(slot) {
-  const duration = Number(slot?.duration ?? 0)
-  const safeDuration = Number.isNaN(duration) || duration <= 0 ? '--' : `${duration} min`
-  const type = String(slot?.type ?? 'online').trim() || 'online'
-  return `${safeDuration} / ${type}`
+  const duration = Number(slot?.duration ?? 0);
+  const safeDuration =
+    Number.isNaN(duration) || duration <= 0 ? "--" : `${duration} min`;
+  const type = String(slot?.type ?? "online").trim() || "online";
+  return `${safeDuration} / ${type}`;
 }
 
 function formatDetail(slot) {
-  return String(slot?.detail ?? '').trim() || '--'
+  return String(slot?.detail ?? "").trim() || "--";
 }
 
 function resolveSelectedSlot() {
-  return slots.value.find((sl) => (sl.slotId ?? sl.id) === selectedSlotId.value) ?? null
+  return (
+    slots.value.find((sl) => (sl.slotId ?? sl.id) === selectedSlotId.value) ??
+    null
+  );
 }
 
 async function openPaymentModal(paymentIntentId, selectedSlot, draftNote) {
-  const safePaymentIntentId = String(paymentIntentId ?? '').trim()
+  const safePaymentIntentId = String(paymentIntentId ?? "").trim();
   if (!safePaymentIntentId) {
-    throw new Error('Missing payment intent id')
+    throw new Error("Missing payment intent id");
   }
 
-  paymentBusy.value = true
-  paymentError.value = ''
-  const specialistId = String(props.id ?? '').trim()
-  const slotId = String(selectedSlot?.slotId ?? selectedSlot?.id ?? '').trim()
+  paymentBusy.value = true;
+  paymentError.value = "";
+  const specialistId = String(props.id ?? "").trim();
+  const slotId = String(selectedSlot?.slotId ?? selectedSlot?.id ?? "").trim();
 
-  const slotAmount = Number(selectedSlot?.amount ?? 0)
-  const safeSlotAmount = Number.isNaN(slotAmount) ? 0 : slotAmount
-  const slotCurrency = String(selectedSlot?.currency ?? 'CNY').trim() || 'CNY'
-  const slotLabel = formatSlotRange(selectedSlot)
+  const slotAmount = Number(selectedSlot?.amount ?? 0);
+  const safeSlotAmount = Number.isNaN(slotAmount) ? 0 : slotAmount;
+  const slotCurrency = String(selectedSlot?.currency ?? "CNY").trim() || "CNY";
+  const slotLabel = formatSlotRange(selectedSlot);
 
   try {
     const payment = await api.createBookingPayment(safePaymentIntentId, {
@@ -98,275 +102,302 @@ async function openPaymentModal(paymentIntentId, selectedSlot, draftNote) {
       slotId,
       amount: safeSlotAmount,
       currency: slotCurrency,
-      scene: 'booking'
-    })
+      scene: "booking",
+    });
 
     paymentContext.value = {
       paymentIntentId: safePaymentIntentId,
-      paymentId: String(payment?.paymentId ?? '').trim(),
+      paymentId: String(payment?.paymentId ?? "").trim(),
       specialistId,
       slotId,
-      note: String(draftNote ?? '').trim(),
+      note: String(draftNote ?? "").trim(),
       amount: Number(payment?.amount ?? safeSlotAmount) || 0,
-      currency: String(payment?.currency ?? slotCurrency).trim() || 'CNY',
+      currency: String(payment?.currency ?? slotCurrency).trim() || "CNY",
       slotLabel,
-      qrCodeUrl: String(payment?.qrCodeUrl ?? '').trim(),
-      mockMode: false
-    }
+      qrCodeUrl: String(payment?.qrCodeUrl ?? "").trim(),
+      mockMode: false,
+    };
   } catch (e) {
     paymentContext.value = {
       paymentIntentId: safePaymentIntentId,
-      paymentId: '',
+      paymentId: "",
       specialistId,
       slotId,
-      note: String(draftNote ?? '').trim(),
+      note: String(draftNote ?? "").trim(),
       amount: safeSlotAmount,
       currency: slotCurrency,
       slotLabel,
-      qrCodeUrl: '',
-      mockMode: false
-    }
-    paymentError.value = e?.message || 'Failed to create Alipay order'
+      qrCodeUrl: "",
+      mockMode: false,
+    };
+    paymentError.value = e?.message || "Failed to create Alipay order";
   } finally {
-    paymentBusy.value = false
-    paymentModalOpen.value = true
+    paymentBusy.value = false;
+    paymentModalOpen.value = true;
   }
 }
 
 function closePaymentModal() {
-  paymentModalOpen.value = false
-  paymentError.value = ''
+  paymentModalOpen.value = false;
+  paymentError.value = "";
 }
 
 async function confirmPaymentAndGoBookings() {
   if (!paymentContext.value.paymentIntentId) {
-    paymentError.value = 'Missing payment intent id for payment confirmation'
-    return
+    paymentError.value = "Missing payment intent id for payment confirmation";
+    return;
   }
 
-  paymentBusy.value = true
-  paymentError.value = ''
+  paymentBusy.value = true;
+  paymentError.value = "";
   try {
     await api.confirmBookingPayment(paymentContext.value.paymentIntentId, {
       paymentId: paymentContext.value.paymentId || undefined,
-      status: 'SUCCESS'
-    })
+      status: "SUCCESS",
+    });
     await api.createBooking({
       specialistId: paymentContext.value.specialistId,
       slotId: paymentContext.value.slotId,
       paymentId: paymentContext.value.paymentId,
-      note: paymentContext.value.note || undefined
-    })
+      note: paymentContext.value.note || undefined,
+    });
   } catch (e) {
-    paymentError.value = e?.message || 'Failed to confirm payment'
-    paymentBusy.value = false
-    return
+    paymentError.value = e?.message || "Failed to confirm payment";
+    paymentBusy.value = false;
+    return;
   }
 
-  paymentModalOpen.value = false
+  paymentModalOpen.value = false;
   showAlertModal({
-    type: 'success',
-    message: 'Payment successful.',
+    type: "success",
+    message: "Payment successful.",
     onClose: () =>
       router.push({
-        name: 'customer.bookings',
-        query: { refresh: String(Date.now()) }
-      })
-  })
-  paymentBusy.value = false
+        name: "customer.bookings",
+        query: { refresh: String(Date.now()) },
+      }),
+  });
+  paymentBusy.value = false;
 }
 
 async function mockPaymentAndGoBookings() {
   if (!paymentContext.value.paymentIntentId) {
-    paymentError.value = 'Missing payment intent id for mock payment'
-    return
+    paymentError.value = "Missing payment intent id for mock payment";
+    return;
   }
 
-  paymentBusy.value = true
-  paymentError.value = ''
+  paymentBusy.value = true;
+  paymentError.value = "";
   try {
-    await api.mockBookingPayment(paymentContext.value.paymentIntentId)
+    await api.mockBookingPayment(paymentContext.value.paymentIntentId);
     await api.createBooking({
       specialistId: paymentContext.value.specialistId,
       slotId: paymentContext.value.slotId,
       paymentId: paymentContext.value.paymentId,
-      note: paymentContext.value.note || undefined
-    })
+      note: paymentContext.value.note || undefined,
+    });
   } catch (e) {
-    paymentError.value = e?.message || 'Failed to mock payment'
-    paymentBusy.value = false
-    return
+    paymentError.value = e?.message || "Failed to mock payment";
+    paymentBusy.value = false;
+    return;
   }
 
-  paymentModalOpen.value = false
+  paymentModalOpen.value = false;
   showAlertModal({
-    type: 'success',
-    message: 'Mock payment successful.',
+    type: "success",
+    message: "Mock payment successful.",
     onClose: () =>
       router.push({
-        name: 'customer.bookings',
-        query: { refresh: String(Date.now()) }
-      })
-  })
-  paymentBusy.value = false
+        name: "customer.bookings",
+        query: { refresh: String(Date.now()) },
+      }),
+  });
+  paymentBusy.value = false;
 }
 
 async function cancelPaymentAndCloseModal() {
   if (!paymentContext.value.paymentIntentId) {
-    paymentError.value = 'Missing payment intent id for cancellation'
-    return
+    paymentError.value = "Missing payment intent id for cancellation";
+    return;
   }
-  paymentBusy.value = true
-  paymentError.value = ''
+  paymentBusy.value = true;
+  paymentError.value = "";
   try {
-    await api.cancelUnpaidPayment(paymentContext.value.paymentIntentId)
+    await api.cancelUnpaidPayment(paymentContext.value.paymentIntentId);
   } catch (e) {
-    paymentError.value = e?.message || 'Failed to cancel payment'
-    paymentBusy.value = false
-    return
+    paymentError.value = e?.message || "Failed to cancel payment";
+    paymentBusy.value = false;
+    return;
   }
-  paymentModalOpen.value = false
-  showAlertModal({ type: 'success', message: 'Payment cancelled.' })
-  paymentBusy.value = false
+  paymentModalOpen.value = false;
+  showAlertModal({ type: "success", message: "Payment cancelled." });
+  paymentBusy.value = false;
 }
 
 function nextSevenDates() {
-  const out = []
-  const base = new Date()
+  const out = [];
+  const base = new Date();
   for (let i = 0; i < 7; i += 1) {
-    const d = new Date(base)
-    d.setDate(base.getDate() + i)
-    out.push(d.toISOString().slice(0, 10))
+    const d = new Date(base);
+    d.setDate(base.getDate() + i);
+    out.push(d.toISOString().slice(0, 10));
   }
-  return out
+  return out;
 }
-
 async function loadWeeklyPreview() {
-  if (!props.id) return
+  if (!props.id) return;
 
-  previewLoading.value = true
-  previewError.value = ''
+  previewLoading.value = true;
+  previewError.value = "";
   try {
-    const days = nextSevenDates()
+    const days = nextSevenDates();
     const rows = await Promise.all(
       days.map(async (date) => {
-        const list = await api.listSpecialistSlots(props.id, { date })
-        const available = (Array.isArray(list) ? list : []).filter((sl) => sl?.available !== false)
+        const list = await api.listSpecialistSlots(props.id, { date });
+        const available = (Array.isArray(list) ? list : []).filter(
+          (sl) => sl?.available !== false,
+        );
         return {
           date,
-          slots: available
-        }
-      })
-    )
-    weeklyPreview.value = rows
+          slots: available,
+        };
+      }),
+    );
+    weeklyPreview.value = rows;
   } catch (e) {
-    previewError.value = e?.message || 'Failed to load weekly preview'
-    weeklyPreview.value = []
+    previewError.value = e?.message || "Failed to load weekly preview";
+    weeklyPreview.value = [];
   } finally {
-    previewLoading.value = false
+    previewLoading.value = false;
   }
 }
 
 function togglePreview() {
-  previewOpen.value = !previewOpen.value
+  previewOpen.value = !previewOpen.value;
 }
 
 const todayPreviewSlots = computed(() => {
-  const today = weeklyPreview.value.find((d) => d.date === todayDate)
-  return today?.slots ?? []
-})
+  const today = weeklyPreview.value.find((d) => d.date === todayDate);
+  return today?.slots ?? [];
+});
 
 const todayPreviewText = computed(() => {
-  if (previewLoading.value) return 'Loading today availability...'
-  if (previewError.value) return 'Failed to load today availability'
-  if (!todayPreviewSlots.value.length) return 'Today: No available slots'
-  return `Today: ${todayPreviewSlots.value.map((sl) => formatSlotRange(sl)).join(' / ')}`
-})
+  if (previewLoading.value) return "Loading today availability...";
+  if (previewError.value) return "Failed to load today availability";
+  if (!todayPreviewSlots.value.length) return "Today: No available slots";
+  return `Today: ${todayPreviewSlots.value.map((sl) => formatSlotRange(sl)).join(" / ")}`;
+});
 
 async function loadSlots() {
-  if (!props.id) return
+  if (!props.id) return;
 
-  loading.value = true
-  error.value = ''
+  loading.value = true;
+  error.value = "";
 
   try {
-    slots.value = await api.listSpecialistSlots(props.id, { date: slotDate.value })
-    selectedSlotId.value = ''
+    slots.value = await api.listSpecialistSlots(props.id, {
+      date: slotDate.value,
+    });
+    selectedSlotId.value = "";
   } catch (e) {
-    slots.value = []
-    error.value = e?.message || 'Failed to load slots'
+    slots.value = [];
+    error.value = e?.message || "Failed to load slots";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
-
 async function submitBooking() {
   if (!props.id) {
-    error.value = 'Missing specialistId'
-    showAlertModal({ type: 'error', message: error.value })
-    return
+    error.value = "Missing specialistId";
+    showAlertModal({ type: "error", message: error.value });
+    return;
   }
   if (!selectedSlotId.value) {
-    error.value = 'Please select a slot first'
-    showAlertModal({ type: 'error', message: error.value })
-    return
+    error.value = "Please select a slot first";
+    showAlertModal({ type: "error", message: error.value });
+    return;
   }
 
-  submitting.value = true
-  error.value = ''
+  submitting.value = true;
+  error.value = "";
   try {
     if (isReschedule.value) {
-      await api.rescheduleBooking(props.bookingId, { slotId: selectedSlotId.value })
-      selectedSlotId.value = ''
+      await api.rescheduleBooking(props.bookingId, {
+        slotId: selectedSlotId.value,
+      });
+      selectedSlotId.value = "";
       showAlertModal({
-        type: 'success',
-        message: 'Rescheduled successfully.',
-        onClose: () => router.push({ name: 'customer.bookingDetail', params: { id: props.bookingId } })
-      })
+        type: "success",
+        message: "Rescheduled successfully.",
+        onClose: () =>
+          router.push({
+            name: "customer.bookingDetail",
+            params: { id: props.bookingId },
+          }),
+      });
     } else {
-      const selectedSlot = resolveSelectedSlot()
-      const draftNote = note.value.trim()
-      const paymentIntentId = (globalThis.crypto?.randomUUID?.() ?? `pi_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`)
-      selectedSlotId.value = ''
-      await loadSlots()
-      await openPaymentModal(paymentIntentId, selectedSlot, draftNote)
-      return
+      const selectedSlot = resolveSelectedSlot();
+      const draftNote = note.value.trim();
+      const paymentIntentId =
+        globalThis.crypto?.randomUUID?.() ??
+        `pi_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      selectedSlotId.value = "";
+      await loadSlots();
+      await openPaymentModal(paymentIntentId, selectedSlot, draftNote);
+      return;
     }
-    await loadSlots()
+    await loadSlots();
   } catch (e) {
-    error.value = e?.message || (isReschedule.value ? 'Failed to reschedule' : 'Failed to submit booking')
-    showAlertModal({ type: 'error', message: error.value })
+    error.value =
+      e?.message ||
+      (isReschedule.value
+        ? "Failed to reschedule"
+        : "Failed to submit booking");
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    submitting.value = false
+    submitting.value = false;
   }
 }
 
 watch(
-    () => props.id,
-    async () => {
-      await Promise.all([loadSlots(), loadWeeklyPreview()])
-    },
-    { immediate: true }
-)
+  () => props.id,
+  async () => {
+    await Promise.all([loadSlots(), loadWeeklyPreview()]);
+  },
+  { immediate: true },
+);
 
-watch(slotDate, () => loadSlots())
+watch(slotDate, () => loadSlots());
 
 defineExpose({
   selectedSlotId,
-  getSelectedSlot: () => slots.value.find((sl) => (sl.slotId ?? sl.id) === selectedSlotId.value)
-})
+  getSelectedSlot: () =>
+    slots.value.find((sl) => (sl.slotId ?? sl.id) === selectedSlotId.value),
+});
 </script>
 
 <template>
   <section class="page">
     <header class="page__header">
-      <h1>{{ isReschedule ? 'Reschedule - Choose a New Slot' : 'Specialist Available Slots' }}</h1>
+      <h1>
+        {{
+          isReschedule
+            ? "Reschedule - Choose a New Slot"
+            : "Specialist Available Slots"
+        }}
+      </h1>
       <p class="subtitle">
-        {{ isReschedule ? 'Choose a new available time slot to reschedule this booking.' : 'Choose a date and an available time slot to submit your booking request.' }}
+        {{
+          isReschedule
+            ? "Choose a new available time slot to reschedule this booking."
+            : "Choose a date and an available time slot to submit your booking request."
+        }}
       </p>
     </header>
 
-    <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
+    <div v-if="error" class="banner banner--error" role="alert">
+      {{ error }}
+    </div>
     <div v-else-if="loading" class="card muted">Loading slots...</div>
 
     <template v-else>
@@ -378,16 +409,31 @@ defineExpose({
           <div class="preview-panel" :class="{ 'is-open': previewOpen }">
             <button type="button" class="preview-head" @click="togglePreview">
               <span class="preview-title">{{ todayPreviewText }}</span>
-              <span class="preview-toggle">{{ previewOpen ? '^' : 'v' }}</span>
+              <span class="preview-toggle">{{ previewOpen ? "^" : "v" }}</span>
             </button>
             <div v-if="previewOpen" class="preview-body">
-              <p v-if="previewError" class="banner banner--error preview-banner">{{ previewError }}</p>
-              <p v-else-if="previewLoading" class="muted small preview-loading">Loading next 7 days...</p>
+              <p
+                v-if="previewError"
+                class="banner banner--error preview-banner"
+              >
+                {{ previewError }}
+              </p>
+              <p v-else-if="previewLoading" class="muted small preview-loading">
+                Loading next 7 days...
+              </p>
               <ul v-else class="preview-list">
-                <li v-for="day in weeklyPreview" :key="day.date" class="preview-row">
+                <li
+                  v-for="day in weeklyPreview"
+                  :key="day.date"
+                  class="preview-row"
+                >
                   <span class="preview-date">{{ day.date }}</span>
                   <div v-if="day.slots.length" class="preview-slots">
-                    <span v-for="sl in day.slots" :key="sl.slotId ?? sl.id" class="preview-chip">
+                    <span
+                      v-for="sl in day.slots"
+                      :key="sl.slotId ?? sl.id"
+                      class="preview-chip"
+                    >
                       {{ formatSlotRange(sl) }}
                     </span>
                   </div>
@@ -407,18 +453,26 @@ defineExpose({
           <li v-for="sl in slots" :key="sl.slotId ?? sl.id" class="slot-row">
             <label class="pick">
               <input
-                  v-model="selectedSlotId"
-                  type="radio"
-                  name="slot"
-                  :value="sl.slotId ?? sl.id"
-                  :disabled="sl.available === false"
+                v-model="selectedSlotId"
+                type="radio"
+                name="slot"
+                :value="sl.slotId ?? sl.id"
+                :disabled="sl.available === false"
               />
               <div class="slot-main">
                 <span class="slot-time">{{ formatSlotRange(sl) }}</span>
-                <span class="slot-meta">{{ formatMoney(sl) }} / {{ formatSession(sl) }}</span>
-                <span class="slot-meta slot-meta--detail" :title="formatDetail(sl)">Detail: {{ formatDetail(sl) }}</span>
+                <span class="slot-meta"
+                  >{{ formatMoney(sl) }} / {{ formatSession(sl) }}</span
+                >
+                <span
+                  class="slot-meta slot-meta--detail"
+                  :title="formatDetail(sl)"
+                  >Detail: {{ formatDetail(sl) }}</span
+                >
               </div>
-              <span v-if="sl.available === false" class="muted small">(Full)</span>
+              <span v-if="sl.available === false" class="muted small"
+                >(Full)</span
+              >
             </label>
           </li>
         </ul>
@@ -442,51 +496,99 @@ defineExpose({
           :disabled="submitting || !selectedSlotId"
           @click="submitBooking"
         >
-          {{ submitting ? 'Submitting...' : isReschedule ? 'Submit Reschedule' : 'Submit Booking Request' }}
+          {{
+            submitting
+              ? "Submitting..."
+              : isReschedule
+                ? "Submit Reschedule"
+                : "Submit Booking Request"
+          }}
         </button>
       </div>
     </template>
 
-    <div v-if="paymentModalOpen" class="payment-modal-backdrop" @click.self="closePaymentModal">
-      <section class="payment-modal-card" role="dialog" aria-modal="true" aria-label="Booking Payment">
+    <div
+      v-if="paymentModalOpen"
+      class="payment-modal-backdrop"
+      @click.self="closePaymentModal"
+    >
+      <section
+        class="payment-modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Booking Payment"
+      >
         <header class="payment-modal-head">
           <h3 class="payment-modal-title">Complete Payment</h3>
-          <button type="button" class="btn-secondary" :disabled="paymentBusy" @click="closePaymentModal">
+          <button
+            type="button"
+            class="btn-secondary"
+            :disabled="paymentBusy"
+            @click="closePaymentModal"
+          >
             Pay Later
           </button>
         </header>
 
         <div class="payment-modal-body">
-          <p class="payment-tip">Payment Intent ID: {{ paymentContext.paymentIntentId || '--' }}</p>
+          <p class="payment-tip">
+            Payment Intent ID: {{ paymentContext.paymentIntentId || "--" }}
+          </p>
           <p class="payment-tip">Slot: {{ paymentContext.slotLabel }}</p>
-          <p class="payment-amount">Amount: {{ paymentContext.amount.toFixed(2) }} {{ paymentContext.currency }}</p>
+          <p class="payment-amount">
+            Amount: {{ paymentContext.amount.toFixed(2) }}
+            {{ paymentContext.currency }}
+          </p>
 
           <div class="payment-qr-wrap">
-            <img v-if="paymentContext.qrCodeUrl" class="payment-qr" :src="paymentContext.qrCodeUrl" alt="Payment QR Code" />
+            <img
+              v-if="paymentContext.qrCodeUrl"
+              class="payment-qr"
+              :src="paymentContext.qrCodeUrl"
+              alt="Payment QR Code"
+            />
             <div v-else class="payment-qr-empty">QR code unavailable</div>
           </div>
 
-          <p v-if="paymentError" class="banner banner--error payment-banner">{{ paymentError }}</p>
+          <p v-if="paymentError" class="banner banner--error payment-banner">
+            {{ paymentError }}
+          </p>
         </div>
 
         <footer class="payment-modal-foot">
           <div class="payment-qr-tip-wrap">
             <span class="payment-qr-icon">!</span>
             <div class="payment-qr-tooltip">
-              Please use Mock Payment!<br>
-              Only support QR code payment on the Android sandbox version of Alipay!<br>
-              Test Account: ruaalx2721@sandbox.com<br>
+              Please use Mock Payment!<br />
+              Only support QR code payment on the Android sandbox version of
+              Alipay!<br />
+              Test Account: ruaalx2721@sandbox.com<br />
               Password: 111111
             </div>
           </div>
-          <button type="button" class="btn-secondary" :disabled="paymentBusy" @click="cancelPaymentAndCloseModal">
+          <button
+            type="button"
+            class="btn-secondary"
+            :disabled="paymentBusy"
+            @click="cancelPaymentAndCloseModal"
+          >
             Cancel
           </button>
-          <button type="button" class="btn-secondary" :disabled="paymentBusy" @click="mockPaymentAndGoBookings">
+          <button
+            type="button"
+            class="btn-secondary"
+            :disabled="paymentBusy"
+            @click="mockPaymentAndGoBookings"
+          >
             Mock Payment
           </button>
-          <button type="button" class="btn-submit" :disabled="paymentBusy" @click="confirmPaymentAndGoBookings">
-            {{ paymentBusy ? 'Confirming...' : 'Paid' }}
+          <button
+            type="button"
+            class="btn-submit"
+            :disabled="paymentBusy"
+            @click="confirmPaymentAndGoBookings"
+          >
+            {{ paymentBusy ? "Confirming..." : "Paid" }}
           </button>
         </footer>
       </section>
@@ -503,7 +605,7 @@ defineExpose({
   margin-top: 12px;
 }
 
-/* 感叹号 */
+
 .payment-qr-icon {
   width: 18px;
   height: 18px;
@@ -516,13 +618,12 @@ defineExpose({
   align-items: center;
   justify-content: center;
   cursor: pointer;
-
 }
 
-/* tooltip 本体 */
+
 .payment-qr-tooltip {
   position: absolute;
-  bottom: 130%; /* 在上方 */
+  bottom: 130%; 
   left: 50%;
   transform: translateX(-50%);
   width: 240px;
@@ -540,7 +641,7 @@ defineExpose({
   transition: opacity 0.2s ease;
 }
 
-/* hover 显示 */
+
 .payment-qr-tip-wrap:hover .payment-qr-tooltip {
   opacity: 1;
 }
@@ -937,7 +1038,3 @@ defineExpose({
   }
 }
 </style>
-
-
-
-

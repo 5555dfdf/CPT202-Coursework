@@ -1,63 +1,65 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { api } from '@/api/client'
-import { showAlertModal } from '@/ui/alertModal'
+import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import { api } from "@/api/client";
+import { showAlertModal } from "@/ui/alertModal";
+// for search, list, edit modal, delete
+const router = useRouter();
+const today = new Date().toISOString().slice(0, 10);
 
-const router = useRouter()
-const today = new Date().toISOString().slice(0, 10)
+const specialists = ref([]);
+const specialistsLoading = ref(false);
+const specialistLoadError = ref("");
 
-const specialists = ref([])
-const specialistsLoading = ref(false)
-const specialistLoadError = ref('')
+const slots = ref([]);
+const searchedOnce = ref(false);
+const slotSearchQuery = ref("");
 
-const slots = ref([])
-const searchedOnce = ref(false)
-const slotSearchQuery = ref('')
+const searchLoading = ref(false);
+const updateLoading = ref(false);
+const deletingId = ref("");
 
-const searchLoading = ref(false)
-const updateLoading = ref(false)
-const deletingId = ref('')
-
-const success = ref('')
-const error = ref('')
-
+const success = ref("");
+const error = ref("");
 const searchForm = ref({
-  specialistId: '',
+  specialistId: "",
   date: today,
-  from: '',
-  to: '',
-  available: ''
-})
+  from: "",
+  to: "",
+  available: "",
+});
 
-const editOpen = ref(false)
+const editOpen = ref(false);
 const editForm = ref({
-  id: '',
-  specialistId: '',
-  date: '',
-  start: '',
-  end: '',
+  id: "",
+  specialistId: "",
+  date: "",
+  start: "",
+  end: "",
   available: true,
-  amount: '0.00',
-  currency: 'CNY',
-  type: 'online',
-  detail: ''
-})
+  amount: "0.00",
+  currency: "CNY",
+  type: "online",
+  detail: "",
+});
 
 const specialistMap = computed(() => {
   return new Map(
-    specialists.value.map((row) => [String(row?.id ?? '').trim(), String(row?.name ?? '').trim()])
-  )
-})
+    specialists.value.map((row) => [
+      String(row?.id ?? "").trim(),
+      String(row?.name ?? "").trim(),
+    ]),
+  );
+});
 
 const slotCountLabel = computed(() => {
-  const count = slots.value.length
-  return `${count} slot${count === 1 ? '' : 's'}`
-})
+  const count = slots.value.length;
+  return `${count} slot${count === 1 ? "" : "s"}`;
+});
 
 const filteredSlots = computed(() => {
-  const query = slotSearchQuery.value.trim().toLowerCase()
-  if (!query) return slots.value
+  const query = slotSearchQuery.value.trim().toLowerCase();
+  if (!query) return slots.value;
 
   return slots.value.filter((row) => {
     const haystack = [
@@ -66,117 +68,117 @@ const filteredSlots = computed(() => {
       slotDate(row),
       slotStart(row),
       slotEnd(row),
-      formatAvailabilityLabel(slotAvailable(row))
+      formatAvailabilityLabel(slotAvailable(row)),
     ]
-      .join(' ')
-      .toLowerCase()
+      .join(" ")
+      .toLowerCase();
 
-    return haystack.includes(query)
-  })
-})
+    return haystack.includes(query);
+  });
+});
 
 function clearMessages() {
-  success.value = ''
-  error.value = ''
+  success.value = "";
+  error.value = "";
 }
 
 function formatSpecialistLabel(idValue) {
-  const id = String(idValue || '').trim()
-  const name = specialistMap.value.get(id) || ''
-  if (name && id) return `${name} (${id})`
-  return name || id || '--'
+  const id = String(idValue || "").trim();
+  const name = specialistMap.value.get(id) || "";
+  if (name && id) return `${name} (${id})`;
+  return name || id || "--";
 }
 
 function slotId(row) {
-  return String(row?.id ?? row?.slotId ?? '').trim()
+  return String(row?.id ?? row?.slotId ?? "").trim();
 }
 
 function slotSpecialistId(row) {
-  return String(row?.specialistId ?? '').trim()
+  return String(row?.specialistId ?? "").trim();
 }
 
 function slotDate(row) {
-  return String(row?.date ?? '').trim() || '--'
+  return String(row?.date ?? "").trim() || "--";
 }
 
 function slotStart(row) {
-  return String(row?.start ?? row?.startTime ?? '').trim() || '--'
+  return String(row?.start ?? row?.startTime ?? "").trim() || "--";
 }
 
 function slotEnd(row) {
-  return String(row?.end ?? row?.endTime ?? '').trim() || '--'
+  return String(row?.end ?? row?.endTime ?? "").trim() || "--";
 }
 
 function slotAvailable(row) {
-  return row?.available !== false
+  return row?.available !== false;
 }
 
 function formatAvailabilityLabel(value) {
-  return value ? 'Available' : 'Unavailable'
+  return value ? "Available" : "Unavailable";
 }
 
 function slotAmount(row) {
-  const amount = row?.amount
-  if (amount === null || amount === undefined || amount === '') return '0.00'
-  const num = Number(amount)
-  if (Number.isNaN(num)) return String(amount)
-  return num.toFixed(2)
+  const amount = row?.amount;
+  if (amount === null || amount === undefined || amount === "") return "0.00";
+  const num = Number(amount);
+  if (Number.isNaN(num)) return String(amount);
+  return num.toFixed(2);
 }
 
 function slotCurrency(row) {
-  return String(row?.currency ?? 'CNY').trim() || 'CNY'
+  return String(row?.currency ?? "CNY").trim() || "CNY";
 }
 
 function slotDuration(row) {
-  const duration = Number(row?.duration)
-  if (Number.isNaN(duration) || duration <= 0) return '--'
-  return `${duration} min`
+  const duration = Number(row?.duration);
+  if (Number.isNaN(duration) || duration <= 0) return "--";
+  return `${duration} min`;
 }
 
 function slotType(row) {
-  return String(row?.type ?? 'online').trim() || 'online'
+  return String(row?.type ?? "online").trim() || "online";
 }
 
 function slotDetail(row) {
-  return String(row?.detail ?? '').trim() || '--'
+  return String(row?.detail ?? "").trim() || "--";
 }
 
 function slotSchedule(row) {
-  const date = slotDate(row)
-  const start = slotStart(row)
-  const end = slotEnd(row)
-  if (date === '--') return '--'
-  return `${date} ${start}-${end}`
+  const date = slotDate(row);
+  const start = slotStart(row);
+  const end = slotEnd(row);
+  if (date === "--") return "--";
+  return `${date} ${start}-${end}`;
 }
 
 function slotSession(row) {
-  const duration = slotDuration(row)
-  const type = slotType(row)
-  if (duration === '--') return type
-  return `${duration} · ${type}`
+  const duration = slotDuration(row);
+  const type = slotType(row);
+  if (duration === "--") return type;
+  return `${duration} · ${type}`;
 }
 
 function calcDurationMinutes(startValue, endValue) {
-  const start = String(startValue ?? '').trim()
-  const end = String(endValue ?? '').trim()
-  if (!start || !end) return 0
-  const [startHour, startMin] = start.split(':').map(Number)
-  const [endHour, endMin] = end.split(':').map(Number)
-  if ([startHour, startMin, endHour, endMin].some(Number.isNaN)) return 0
-  const startTotal = startHour * 60 + startMin
-  const endTotal = endHour * 60 + endMin
-  const diff = endTotal - startTotal
-  return diff > 0 ? diff : 0
+  const start = String(startValue ?? "").trim();
+  const end = String(endValue ?? "").trim();
+  if (!start || !end) return 0;
+  const [startHour, startMin] = start.split(":").map(Number);
+  const [endHour, endMin] = end.split(":").map(Number);
+  if ([startHour, startMin, endHour, endMin].some(Number.isNaN)) return 0;
+  const startTotal = startHour * 60 + startMin;
+  const endTotal = endHour * 60 + endMin;
+  const diff = endTotal - startTotal;
+  return diff > 0 ? diff : 0;
 }
 
 const editDurationMinutes = computed(() =>
-  calcDurationMinutes(editForm.value.start, editForm.value.end)
-)
+  calcDurationMinutes(editForm.value.start, editForm.value.end),
+);
 
 function normalizeAmountInput(value) {
-  if (value === null || value === undefined || value === '') return 0
-  const num = Number(value)
-  return Number.isNaN(num) ? 0 : num
+  if (value === null || value === undefined || value === "") return 0;
+  const num = Number(value);
+  return Number.isNaN(num) ? 0 : num;
 }
 
 function buildSlotPayload(form) {
@@ -186,211 +188,215 @@ function buildSlotPayload(form) {
     end: form.end,
     available: form.available,
     amount: normalizeAmountInput(form.amount),
-    currency: String(form.currency ?? '').trim() || 'CNY',
+    currency: String(form.currency ?? "").trim() || "CNY",
     duration: calcDurationMinutes(form.start, form.end),
-    type: String(form.type ?? '').trim() || 'online',
-    detail: String(form.detail ?? '').trim()
-  }
+    type: String(form.type ?? "").trim() || "online",
+    detail: String(form.detail ?? "").trim(),
+  };
 }
 
 function sortSlots(rows) {
   return [...rows].sort((a, b) => {
-    const specialistDiff = slotSpecialistId(a).localeCompare(slotSpecialistId(b))
-    if (specialistDiff !== 0) return specialistDiff
+    const specialistDiff = slotSpecialistId(a).localeCompare(
+      slotSpecialistId(b),
+    );
+    if (specialistDiff !== 0) return specialistDiff;
 
-    const dateDiff = slotDate(a).localeCompare(slotDate(b))
-    if (dateDiff !== 0) return dateDiff
+    const dateDiff = slotDate(a).localeCompare(slotDate(b));
+    if (dateDiff !== 0) return dateDiff;
 
-    const startDiff = slotStart(a).localeCompare(slotStart(b))
-    if (startDiff !== 0) return startDiff
+    const startDiff = slotStart(a).localeCompare(slotStart(b));
+    if (startDiff !== 0) return startDiff;
 
-    return slotEnd(a).localeCompare(slotEnd(b))
-  })
+    return slotEnd(a).localeCompare(slotEnd(b));
+  });
 }
 
 function isValidTimeRange(startValue, endValue) {
-  if (!startValue || !endValue) return true
-  return String(startValue) < String(endValue)
+  if (!startValue || !endValue) return true;
+  return String(startValue) < String(endValue);
 }
 
 async function loadSpecialists() {
-  specialistsLoading.value = true
-  specialistLoadError.value = ''
+  specialistsLoading.value = true;
+  specialistLoadError.value = "";
   try {
-    const page = await api.listSpecialists({ pageSize: 100 })
-    specialists.value = Array.isArray(page?.items) ? page.items : []
+    const page = await api.listSpecialists({ pageSize: 100 });
+    specialists.value = Array.isArray(page?.items) ? page.items : [];
   } catch (e) {
-    specialistLoadError.value = e?.message || 'Failed to load specialists'
-    specialists.value = []
-    showAlertModal({ type: 'error', message: specialistLoadError.value })
+    specialistLoadError.value = e?.message || "Failed to load specialists";
+    specialists.value = [];
+    showAlertModal({ type: "error", message: specialistLoadError.value });
   } finally {
-    specialistsLoading.value = false
+    specialistsLoading.value = false;
   }
 }
 
 function buildSearchParams() {
-  const params = {}
-  if (searchForm.value.specialistId) params.specialistId = searchForm.value.specialistId
-  if (searchForm.value.date) params.date = searchForm.value.date
-  if (searchForm.value.from) params.from = searchForm.value.from
-  if (searchForm.value.to) params.to = searchForm.value.to
-  if (searchForm.value.available !== '') params.available = searchForm.value.available === 'true'
-  return params
+  const params = {};
+  if (searchForm.value.specialistId)
+    params.specialistId = searchForm.value.specialistId;
+  if (searchForm.value.date) params.date = searchForm.value.date;
+  if (searchForm.value.from) params.from = searchForm.value.from;
+  if (searchForm.value.to) params.to = searchForm.value.to;
+  if (searchForm.value.available !== "")
+    params.available = searchForm.value.available === "true";
+  return params;
 }
-
 async function loadSlots(options = {}) {
-  const { announceSuccess = false, preserveMessages = false } = options
+  const { announceSuccess = false, preserveMessages = false } = options;
 
-  if (!preserveMessages) clearMessages()
+  if (!preserveMessages) clearMessages();
 
   if (!isValidTimeRange(searchForm.value.from, searchForm.value.to)) {
-    error.value = 'Search start time must be earlier than end time.'
-    slots.value = []
-    searchedOnce.value = true
-    showAlertModal({ type: 'error', message: error.value })
-    return
+    error.value = "Search start time must be earlier than end time.";
+    slots.value = [];
+    searchedOnce.value = true;
+    showAlertModal({ type: "error", message: error.value });
+    return;
   }
 
-  searchLoading.value = true
+  searchLoading.value = true;
   try {
-    const rows = await api.adminListSlots(buildSearchParams())
-    slots.value = sortSlots(Array.isArray(rows) ? rows : [])
-    searchedOnce.value = true
+    const rows = await api.adminListSlots(buildSearchParams());
+    slots.value = sortSlots(Array.isArray(rows) ? rows : []);
+    searchedOnce.value = true;
     if (announceSuccess) {
-      success.value = `Loaded ${slotCountLabel.value}.`
-      showAlertModal({ type: 'success', message: success.value })
+      success.value = `Loaded ${slotCountLabel.value}.`;
+      showAlertModal({ type: "success", message: success.value });
     }
   } catch (e) {
-    error.value = e?.message || 'Failed to load slots'
-    slots.value = []
-    searchedOnce.value = true
-    showAlertModal({ type: 'error', message: error.value })
+    error.value = e?.message || "Failed to load slots";
+    slots.value = [];
+    searchedOnce.value = true;
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    searchLoading.value = false
+    searchLoading.value = false;
   }
 }
 
 function resetSearchForm() {
   searchForm.value = {
-    specialistId: '',
+    specialistId: "",
     date: today,
-    from: '',
-    to: '',
-    available: ''
-  }
+    from: "",
+    to: "",
+    available: "",
+  };
 }
 
 function openEdit(row) {
   editForm.value = {
     id: slotId(row),
     specialistId: slotSpecialistId(row),
-    date: String(row?.date ?? '').trim(),
-    start: String(row?.start ?? row?.startTime ?? '').trim(),
-    end: String(row?.end ?? row?.endTime ?? '').trim(),
+    date: String(row?.date ?? "").trim(),
+    start: String(row?.start ?? row?.startTime ?? "").trim(),
+    end: String(row?.end ?? row?.endTime ?? "").trim(),
     available: slotAvailable(row),
     amount: slotAmount(row),
     currency: slotCurrency(row),
     type: slotType(row),
-    detail: String(row?.detail ?? '').trim()
-  }
-  editOpen.value = true
+    detail: String(row?.detail ?? "").trim(),
+  };
+  editOpen.value = true;
 }
 
 function closeEdit() {
-  if (updateLoading.value) return
-  editOpen.value = false
+  if (updateLoading.value) return;
+  editOpen.value = false;
   editForm.value = {
-    id: '',
-    specialistId: '',
-    date: '',
-    start: '',
-    end: '',
+    id: "",
+    specialistId: "",
+    date: "",
+    start: "",
+    end: "",
     available: true,
-    amount: '0.00',
-    currency: 'CNY',
-    type: 'online',
-    detail: ''
-  }
+    amount: "0.00",
+    currency: "CNY",
+    type: "online",
+    detail: "",
+  };
 }
 
 async function onSearch() {
-  await loadSlots({ announceSuccess: true })
+  await loadSlots({ announceSuccess: true });
 }
-
 async function onUpdate() {
-  clearMessages()
+  clearMessages();
 
   if (!editForm.value.id) {
-    error.value = 'Missing slot ID.'
-    showAlertModal({ type: 'error', message: error.value })
-    return
+    error.value = "Missing slot ID.";
+    showAlertModal({ type: "error", message: error.value });
+    return;
   }
   if (!editForm.value.date || !editForm.value.start || !editForm.value.end) {
-    error.value = 'Please complete date, start time, and end time.'
-    showAlertModal({ type: 'error', message: error.value })
-    return
+    error.value = "Please complete date, start time, and end time.";
+    showAlertModal({ type: "error", message: error.value });
+    return;
   }
   if (!isValidTimeRange(editForm.value.start, editForm.value.end)) {
-    error.value = 'Edit slot start time must be earlier than end time.'
-    showAlertModal({ type: 'error', message: error.value })
-    return
+    error.value = "Edit slot start time must be earlier than end time.";
+    showAlertModal({ type: "error", message: error.value });
+    return;
   }
   if (editDurationMinutes.value <= 0) {
-    error.value = 'Please enter a valid duration in minutes.'
-    showAlertModal({ type: 'error', message: error.value })
-    return
+    error.value = "Please enter a valid duration in minutes.";
+    showAlertModal({ type: "error", message: error.value });
+    return;
   }
 
-  updateLoading.value = true
+  updateLoading.value = true;
   try {
     await api.adminUpdateSlot(editForm.value.id, {
-      ...buildSlotPayload(editForm.value)
-    })
-    await loadSlots({ preserveMessages: true })
+      ...buildSlotPayload(editForm.value),
+    });
+    await loadSlots({ preserveMessages: true });
     if (!error.value) {
-      success.value = `Slot ${editForm.value.id} updated successfully.`
-      showAlertModal({ type: 'success', message: success.value })
-      closeEdit()
+      success.value = `Slot ${editForm.value.id} updated successfully.`;
+      showAlertModal({ type: "success", message: success.value });
+      closeEdit();
     }
   } catch (e) {
-    error.value = e?.message || 'Failed to update slot'
-    showAlertModal({ type: 'error', message: error.value })
+    error.value = e?.message || "Failed to update slot";
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    updateLoading.value = false
+    updateLoading.value = false;
   }
 }
 
 async function onDelete(row) {
-  const id = slotId(row)
+  const id = slotId(row);
   if (!id) {
-    error.value = 'This slot is missing an ID and cannot be deleted.'
-    showAlertModal({ type: 'error', message: error.value })
-    return
+    error.value = "This slot is missing an ID and cannot be deleted.";
+    showAlertModal({ type: "error", message: error.value });
+    return;
   }
 
-  const confirmed = window.confirm(`Delete slot "${id}"? This action cannot be undone.`)
-  if (!confirmed) return
+  const confirmed = window.confirm(
+    `Delete slot "${id}"? This action cannot be undone.`,
+  );
+  if (!confirmed) return;
 
-  clearMessages()
-  deletingId.value = id
+  clearMessages();
+  deletingId.value = id;
   try {
-    await api.adminDeleteSlot(id)
-    await loadSlots({ preserveMessages: true })
+    await api.adminDeleteSlot(id);
+    await loadSlots({ preserveMessages: true });
     if (!error.value) {
-      success.value = `Slot ${id} deleted successfully.`
-      showAlertModal({ type: 'success', message: success.value })
+      success.value = `Slot ${id} deleted successfully.`;
+      showAlertModal({ type: "success", message: success.value });
     }
   } catch (e) {
-    error.value = e?.message || 'Failed to delete slot'
-    showAlertModal({ type: 'error', message: error.value })
+    error.value = e?.message || "Failed to delete slot";
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    deletingId.value = ''
+    deletingId.value = "";
   }
 }
 
 onMounted(async () => {
-  await Promise.all([loadSpecialists(), loadSlots()])
-})
+  await Promise.all([loadSpecialists(), loadSlots()]);
+});
 </script>
 
 <template>
@@ -398,7 +404,8 @@ onMounted(async () => {
     <header class="page__header">
       <h1>Slot Management</h1>
       <p class="subtitle">
-        Manage specialist availability by searching, reviewing, and updating consultation slots.
+        Manage specialist availability by searching, reviewing, and updating
+        consultation slots.
       </p>
     </header>
 
@@ -410,7 +417,11 @@ onMounted(async () => {
 
         <div class="field">
           <span class="label">Specialist</span>
-          <select v-model="searchForm.specialistId" class="input input--select" :disabled="specialistsLoading">
+          <select
+            v-model="searchForm.specialistId"
+            class="input input--select"
+            :disabled="specialistsLoading"
+          >
             <option value="">All specialists</option>
             <option v-for="row in specialists" :key="row.id" :value="row.id">
               {{ row.name || row.id }} ({{ row.id }})
@@ -437,7 +448,9 @@ onMounted(async () => {
               <button
                 type="button"
                 class="option-btn option-btn--available"
-                :class="{ 'option-btn--active': searchForm.available === 'true' }"
+                :class="{
+                  'option-btn--active': searchForm.available === 'true',
+                }"
                 @click="searchForm.available = 'true'"
               >
                 Available
@@ -445,7 +458,9 @@ onMounted(async () => {
               <button
                 type="button"
                 class="option-btn option-btn--unavailable"
-                :class="{ 'option-btn--active': searchForm.available === 'false' }"
+                :class="{
+                  'option-btn--active': searchForm.available === 'false',
+                }"
                 @click="searchForm.available = 'false'"
               >
                 Unavailable
@@ -465,13 +480,23 @@ onMounted(async () => {
           </label>
         </div>
 
-        <!-- banner 弃用：错误改为弹窗提示（见 loadSpecialists） -->
+        
 
         <div class="button-row">
-          <button type="button" class="btn-primary btn-primary--fit" :disabled="searchLoading" @click="onSearch">
-            {{ searchLoading ? 'Searching...' : 'Search Slots' }}
+          <button
+            type="button"
+            class="btn-primary btn-primary--fit"
+            :disabled="searchLoading"
+            @click="onSearch"
+          >
+            {{ searchLoading ? "Searching..." : "Search Slots" }}
           </button>
-          <button type="button" class="btn-neutral" :disabled="searchLoading" @click="resetSearchForm">
+          <button
+            type="button"
+            class="btn-neutral"
+            :disabled="searchLoading"
+            @click="resetSearchForm"
+          >
             Reset Filters
           </button>
         </div>
@@ -483,11 +508,16 @@ onMounted(async () => {
         <div class="toolbar-title">
           <h2 class="card-title">Existing Slots</h2>
           <p class="list-note">
-            Search results populate this management table for review, edit, and delete actions.
+            Search results populate this management table for review, edit, and
+            delete actions.
           </p>
         </div>
         <div class="toolbar-actions">
-          <button type="button" class="btn-neutral btn-create-nav" @click="router.push({ name: 'admin.slotCreate' })">
+          <button
+            type="button"
+            class="btn-neutral btn-create-nav"
+            @click="router.push({ name: 'admin.slotCreate' })"
+          >
             Go to Create Slot
           </button>
           <input
@@ -497,8 +527,13 @@ onMounted(async () => {
             placeholder="Search slots"
             aria-label="Search slots"
           />
-          <button type="button" class="btn-neutral btn-refresh" :disabled="searchLoading" @click="onSearch">
-            {{ searchLoading ? 'Refreshing...' : 'Refresh' }}
+          <button
+            type="button"
+            class="btn-neutral btn-refresh"
+            :disabled="searchLoading"
+            @click="onSearch"
+          >
+            {{ searchLoading ? "Refreshing..." : "Refresh" }}
           </button>
         </div>
       </div>
@@ -507,10 +542,16 @@ onMounted(async () => {
         <span class="meta-pill">{{ slotCountLabel }}</span>
       </div>
 
-      <div v-if="searchLoading && !slots.length" class="state">Loading slots...</div>
+      <div v-if="searchLoading && !slots.length" class="state">
+        Loading slots...
+      </div>
 
       <div v-else-if="!slots.length" class="state state--empty">
-        {{ searchedOnce ? 'No slots found for the current filters.' : 'Run a search to review slots.' }}
+        {{
+          searchedOnce
+            ? "No slots found for the current filters."
+            : "Run a search to review slots."
+        }}
       </div>
 
       <div v-else-if="!filteredSlots.length" class="state state--empty">
@@ -532,13 +573,20 @@ onMounted(async () => {
           </thead>
           <tbody>
             <tr v-for="row in filteredSlots" :key="slotId(row)">
-              <td class="cell--wrap">{{ formatSpecialistLabel(slotSpecialistId(row)) }}</td>
+              <td class="cell--wrap">
+                {{ formatSpecialistLabel(slotSpecialistId(row)) }}
+              </td>
               <td>{{ slotSchedule(row) }}</td>
               <td>{{ slotAmount(row) }} {{ slotCurrency(row) }}</td>
               <td>{{ slotSession(row) }}</td>
-              <td class="cell--detail" :title="slotDetail(row)">{{ slotDetail(row) }}</td>
+              <td class="cell--detail" :title="slotDetail(row)">
+                {{ slotDetail(row) }}
+              </td>
               <td>
-                <span class="status-pill" :class="{ 'status-pill--off': !slotAvailable(row) }">
+                <span
+                  class="status-pill"
+                  :class="{ 'status-pill--off': !slotAvailable(row) }"
+                >
                   {{ formatAvailabilityLabel(slotAvailable(row)) }}
                 </span>
               </td>
@@ -558,7 +606,7 @@ onMounted(async () => {
                     :disabled="updateLoading || deletingId === slotId(row)"
                     @click="onDelete(row)"
                   >
-                    {{ deletingId === slotId(row) ? 'Deleting...' : 'Delete' }}
+                    {{ deletingId === slotId(row) ? "Deleting..." : "Delete" }}
                   </button>
                 </div>
               </td>
@@ -577,11 +625,13 @@ onMounted(async () => {
         <div class="detail-list">
           <div class="detail-row">
             <span class="detail-key">Slot ID</span>
-            <span class="detail-value mono">{{ editForm.id || '--' }}</span>
+            <span class="detail-value mono">{{ editForm.id || "--" }}</span>
           </div>
           <div class="detail-row">
             <span class="detail-key">Specialist</span>
-            <span class="detail-value">{{ formatSpecialistLabel(editForm.specialistId) }}</span>
+            <span class="detail-value">{{
+              formatSpecialistLabel(editForm.specialistId)
+            }}</span>
           </div>
         </div>
 
@@ -627,42 +677,77 @@ onMounted(async () => {
         <div class="field-grid field-grid--two">
           <label class="field">
             <span class="label">Amount</span>
-            <input v-model="editForm.amount" type="number" min="0" step="0.01" class="input" />
+            <input
+              v-model="editForm.amount"
+              type="number"
+              min="0"
+              step="0.01"
+              class="input"
+            />
           </label>
           <label class="field">
             <span class="label">Currency</span>
-            <input v-model.trim="editForm.currency" type="text" maxlength="10" class="input" />
+            <input
+              v-model.trim="editForm.currency"
+              type="text"
+              maxlength="10"
+              class="input"
+            />
           </label>
         </div>
 
         <div class="field-grid field-grid--two">
           <label class="field">
             <span class="label">Duration (minutes, auto)</span>
-            <input :value="editDurationMinutes" type="number" class="input" readonly />
+            <input
+              :value="editDurationMinutes"
+              type="number"
+              class="input"
+              readonly
+            />
           </label>
           <label class="field">
             <span class="label">Type</span>
-            <input v-model.trim="editForm.type" type="text" maxlength="20" class="input" />
+            <input
+              v-model.trim="editForm.type"
+              type="text"
+              maxlength="20"
+              class="input"
+            />
           </label>
         </div>
 
         <label class="field">
           <span class="label">Detail</span>
-          <textarea v-model="editForm.detail" class="input input--textarea" rows="3" />
+          <textarea
+            v-model="editForm.detail"
+            class="input input--textarea"
+            rows="3"
+          />
         </label>
 
         <div class="modal-footer">
           <div class="tip-wrap">
             <span class="icon">!</span>
             <div class="tooltip">
-              Please check and follow Specialist's Pricing Rules!<br>
+              Please check and follow Specialist's Pricing Rules!<br />
             </div>
           </div>
-          <button type="button" class="btn-neutral" :disabled="updateLoading" @click="closeEdit">
+          <button
+            type="button"
+            class="btn-neutral"
+            :disabled="updateLoading"
+            @click="closeEdit"
+          >
             Cancel
           </button>
-          <button type="button" class="btn-primary btn-primary--fit modal-save" :disabled="updateLoading" @click="onUpdate">
-            {{ updateLoading ? 'Saving...' : 'Save Changes' }}
+          <button
+            type="button"
+            class="btn-primary btn-primary--fit modal-save"
+            :disabled="updateLoading"
+            @click="onUpdate"
+          >
+            {{ updateLoading ? "Saving..." : "Save Changes" }}
           </button>
         </div>
       </section>
@@ -679,7 +764,7 @@ onMounted(async () => {
   margin-top: 12px;
 }
 
-/* 感叹号 */
+
 .icon {
   width: 18px;
   height: 18px;
@@ -692,13 +777,12 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-
 }
 
-/* tooltip 本体 */
+
 .tooltip {
   position: absolute;
-  bottom: 130%; /* 在上方 */
+  bottom: 130%; 
   left: 50%;
   transform: translateX(-50%);
   width: 240px;
@@ -716,7 +800,7 @@ onMounted(async () => {
   transition: opacity 0.2s ease;
 }
 
-/* hover 显示 */
+
 .tip-wrap:hover .tooltip {
   opacity: 1;
 }
@@ -828,7 +912,9 @@ onMounted(async () => {
   background-position:
     calc(100% - 18px) calc(50% - 3px),
     calc(100% - 12px) calc(50% - 3px);
-  background-size: 6px 6px, 6px 6px;
+  background-size:
+    6px 6px,
+    6px 6px;
   background-repeat: no-repeat;
   cursor: pointer;
 }
@@ -871,7 +957,10 @@ onMounted(async () => {
   color: #374151;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
 }
 
 .option-btn--type {
@@ -1078,7 +1167,9 @@ onMounted(async () => {
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
 }
 
 .weak {

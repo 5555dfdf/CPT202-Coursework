@@ -1,31 +1,39 @@
 ﻿<script setup>
-import { onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
-import { api } from '@/api/client'
-import { BadgeDollarSign, CalendarCheck, ChevronRight, Clock3 } from '@lucide/vue'
-import { showAlertModal } from '@/ui/alertModal'
+import { onMounted, ref } from "vue";
+import { RouterLink } from "vue-router";
+import { api } from "@/api/client";
+import {
+  BadgeDollarSign,
+  CalendarCheck,
+  ChevronRight,
+  Clock3,
+} from "@lucide/vue";
+import { showAlertModal } from "@/ui/alertModal";
+// summary metrics for quick overview cards
 
-const expertiseCount = ref(0)
-const specialistTotal = ref(0)
-const loading = ref(false)
-const error = ref('')
-
+const expertiseCount = ref(0);
+const specialistTotal = ref(0);
+const loading = ref(false);
+const error = ref("");
 async function load() {
-  error.value = ''
-  loading.value = true
+  error.value = "";
+  loading.value = true;
   try {
-    const [ex, sp] = await Promise.all([api.listExpertise(), api.listSpecialists({ pageSize: 1 })])
-    expertiseCount.value = ex.length
-    specialistTotal.value = sp.total ?? (sp.items || []).length
+    const [ex, sp] = await Promise.all([
+      api.listExpertise(),
+      api.listSpecialists({ pageSize: 1 }),
+    ]);
+    expertiseCount.value = ex.length;
+    specialistTotal.value = sp.total ?? (sp.items || []).length;
   } catch (e) {
-    error.value = e?.message || 'Failed to load'
-    showAlertModal({ type: 'error', message: error.value })
+    error.value = e?.message || "Failed to load";
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
-onMounted(load)
+onMounted(load);
 </script>
 
 <template>
@@ -39,20 +47,24 @@ onMounted(load)
       <div class="summary-grid">
         <div class="metric-item">
           <div class="metric-main">
-            <div class="num">{{ loading ? '…' : expertiseCount }}</div>
+            <div class="num">{{ loading ? "…" : expertiseCount }}</div>
             <div class="label">Expertise Categories</div>
           </div>
           <div class="metric-action">
-            <RouterLink class="link" :to="{ name: 'admin.expertise' }">Manage</RouterLink>
+            <RouterLink class="link" :to="{ name: 'admin.expertise' }"
+              >Manage</RouterLink
+            >
           </div>
         </div>
         <div class="metric-item">
           <div class="metric-main">
-            <div class="num">{{ loading ? '…' : specialistTotal }}</div>
+            <div class="num">{{ loading ? "…" : specialistTotal }}</div>
             <div class="label">Specialists</div>
           </div>
           <div class="metric-action">
-            <RouterLink class="link" :to="{ name: 'admin.specialists' }">Manage</RouterLink>
+            <RouterLink class="link" :to="{ name: 'admin.specialists' }"
+              >Manage</RouterLink
+            >
           </div>
         </div>
       </div>
@@ -134,7 +146,7 @@ onMounted(load)
   display: flex;
   align-items: center;
   gap: 16px;
-  /* Make KPI row the dominant content area of each metric column. */
+  
   width: 68%;
   min-width: 220px;
   max-width: 100%;

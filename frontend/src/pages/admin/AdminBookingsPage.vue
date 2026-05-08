@@ -1,32 +1,35 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { api } from '@/api/client'
-import { showAlertModal } from '@/ui/alertModal'
+import { computed, onMounted, ref } from "vue";
+import { api } from "@/api/client";
+import { showAlertModal } from "@/ui/alertModal";
 
-const PAGE_SIZE = 10
-const page = ref({ items: [], total: 0, page: 1, pageSize: PAGE_SIZE })
-const loading = ref(false)
-const error = ref('')
-const missingApi = ref(false)
-const expandedBookingId = ref('')
-const detailMap = ref({})
-const detailErrorMap = ref({})
-const detailLoadingId = ref('')
-const bookingSearchQuery = ref('')
-const exportLoading = ref(false)
+const PAGE_SIZE = 10;
+const page = ref({ items: [], total: 0, page: 1, pageSize: PAGE_SIZE });
+const loading = ref(false);
+const error = ref("");
+const missingApi = ref(false);
+const expandedBookingId = ref("");
+const detailMap = ref({});
+const detailErrorMap = ref({});
+const detailLoadingId = ref("");
+const bookingSearchQuery = ref("");
+const exportLoading = ref(false);
 
 const totalBookings = computed(() => {
-  return Math.max(Number(page.value?.total) || 0, (page.value?.items || []).length)
-})
+  return Math.max(
+    Number(page.value?.total) || 0,
+    (page.value?.items || []).length,
+  );
+});
 
 const bookingCountLabel = computed(() => {
-  const count = totalBookings.value
-  return `${count} booking${count === 1 ? '' : 's'}`
-})
+  const count = totalBookings.value;
+  return `${count} booking${count === 1 ? "" : "s"}`;
+});
 const filteredBookings = computed(() => {
-  const query = bookingSearchQuery.value.trim().toLowerCase()
-  const items = page.value?.items || []
-  if (!query) return items
+  const query = bookingSearchQuery.value.trim().toLowerCase();
+  const items = page.value?.items || [];
+  if (!query) return items;
 
   return items.filter((row) => {
     const haystack = [
@@ -34,167 +37,176 @@ const filteredBookings = computed(() => {
       bookingStatus(row),
       bookingTime(row),
       customerLabel(row),
-      specialistLabel(row)
+      specialistLabel(row),
     ]
-      .join(' ')
-      .toLowerCase()
+      .join(" ")
+      .toLowerCase();
 
-    return haystack.includes(query)
-  })
-})
+    return haystack.includes(query);
+  });
+});
 
 function bookingId(row) {
-  return String(row?.id ?? '').trim()
+  return String(row?.id ?? "").trim();
 }
 
 function bookingStatus(row) {
-  return String(row?.status ?? '').trim() || '--'
+  return String(row?.status ?? "").trim() || "--";
 }
 
 function bookingTime(row) {
-  return String(row?.time ?? row?.startTime ?? '').trim() || '--'
+  return String(row?.time ?? row?.startTime ?? "").trim() || "--";
 }
 
 function customerLabel(row) {
-  return String(row?.customerName ?? row?.customerId ?? '').trim() || '--'
+  return String(row?.customerName ?? row?.customerId ?? "").trim() || "--";
 }
 
 function specialistLabel(row) {
-  return String(row?.specialistName ?? row?.specialistId ?? '').trim() || '--'
+  return String(row?.specialistName ?? row?.specialistId ?? "").trim() || "--";
 }
 
 function bookingNote(row) {
-  return String(row?.note ?? '').trim() || '--'
+  return String(row?.note ?? "").trim() || "--";
 }
 
 function formatPrice(value) {
-  if (!value) return '--'
-  const str = String(value)
-  const numericPart = str.replace(/[^0-9.]/g, '')
-  const currencyPart = str.replace(/[0-9.]/g, '').trim()
-  const amount = Number(numericPart)
-  if (!Number.isFinite(amount)) return '--'
-  return `${amount.toFixed(2)} ${currencyPart || ''}`.trim()
+  if (!value) return "--";
+  const str = String(value);
+  const numericPart = str.replace(/[^0-9.]/g, "");
+  const currencyPart = str.replace(/[0-9.]/g, "").trim();
+  const amount = Number(numericPart);
+  if (!Number.isFinite(amount)) return "--";
+  return `${amount.toFixed(2)} ${currencyPart || ""}`.trim();
 }
 
 function detailRecord(id) {
-  return detailMap.value[id] ?? null
+  return detailMap.value[id] ?? null;
 }
 
 function detailError(id) {
-  return detailErrorMap.value[id] ?? ''
+  return detailErrorMap.value[id] ?? "";
 }
 
 function statusClass(row) {
-  const status = bookingStatus(row).toLowerCase()
-  if (status === 'confirmed' || status === 'completed') return 'status-pill status-pill--positive'
-  if (status === 'cancelled' || status === 'rejected') return 'status-pill status-pill--negative'
-  return 'status-pill'
+  const status = bookingStatus(row).toLowerCase();
+  if (status === "confirmed" || status === "completed")
+    return "status-pill status-pill--positive";
+  if (status === "cancelled" || status === "rejected")
+    return "status-pill status-pill--negative";
+  return "status-pill";
 }
-
 async function load() {
-  error.value = ''
-  missingApi.value = false
-  loading.value = true
-  expandedBookingId.value = ''
-  detailMap.value = {}
-  detailErrorMap.value = {}
+  error.value = "";
+  missingApi.value = false;
+  loading.value = true;
+  expandedBookingId.value = "";
+  detailMap.value = {};
+  detailErrorMap.value = {};
 
   try {
-    const current = Number(page.value?.page) || 1
-    page.value = await api.adminListBookings({ page: current, pageSize: PAGE_SIZE })
+    const current = Number(page.value?.page) || 1;
+    page.value = await api.adminListBookings({
+      page: current,
+      pageSize: PAGE_SIZE,
+    });
   } catch (e) {
     if (e?.status === 404) {
-      missingApi.value = true
-      error.value = 'Admin bookings endpoint is not available (404)'
-      showAlertModal({ type: 'warn', message: error.value })
+      missingApi.value = true;
+      error.value = "Admin bookings endpoint is not available (404)";
+      showAlertModal({ type: "warn", message: error.value });
     } else {
-      error.value = e?.message || 'Failed to load bookings'
-      showAlertModal({ type: 'error', message: error.value })
+      error.value = e?.message || "Failed to load bookings";
+      showAlertModal({ type: "error", message: error.value });
     }
-    page.value = { items: [], total: 0, page: 1, pageSize: PAGE_SIZE }
+    page.value = { items: [], total: 0, page: 1, pageSize: PAGE_SIZE };
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 function totalPages() {
-  const total = Number(page.value?.total || 0)
-  return Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const total = Number(page.value?.total || 0);
+  return Math.max(1, Math.ceil(total / PAGE_SIZE));
 }
 
 async function prevPage() {
-  if (loading.value) return
-  const current = Number(page.value?.page) || 1
-  if (current <= 1) return
-  page.value = { ...page.value, page: current - 1 }
-  await load()
+  if (loading.value) return;
+  const current = Number(page.value?.page) || 1;
+  if (current <= 1) return;
+  page.value = { ...page.value, page: current - 1 };
+  await load();
 }
 
 async function nextPage() {
-  if (loading.value) return
-  const current = Number(page.value?.page) || 1
-  if (current >= totalPages()) return
-  page.value = { ...page.value, page: current + 1 }
-  await load()
+  if (loading.value) return;
+  const current = Number(page.value?.page) || 1;
+  if (current >= totalPages()) return;
+  page.value = { ...page.value, page: current + 1 };
+  await load();
 }
-
+// lazily fetch detail when first opened
 async function toggleBooking(row) {
-  const id = bookingId(row)
-  if (!id) return
+  const id = bookingId(row);
+  if (!id) return;
 
   if (expandedBookingId.value === id) {
-    expandedBookingId.value = ''
-    return
+    expandedBookingId.value = "";
+    return;
   }
 
-  expandedBookingId.value = id
-  if (detailRecord(id) || detailLoadingId.value === id) return
+  expandedBookingId.value = id;
+  if (detailRecord(id) || detailLoadingId.value === id) return;
 
-  detailErrorMap.value = { ...detailErrorMap.value, [id]: '' }
-  detailLoadingId.value = id
+  detailErrorMap.value = { ...detailErrorMap.value, [id]: "" };
+  detailLoadingId.value = id;
 
   try {
-    const detail = await api.adminGetBooking(id)
-    detailMap.value = { ...detailMap.value, [id]: detail }
+    const detail = await api.adminGetBooking(id);
+    detailMap.value = { ...detailMap.value, [id]: detail };
   } catch (e) {
     const msg =
-      e?.status === 404 ? 'Booking detail endpoint is not available (404)' : e?.message || 'Failed to load booking detail'
+      e?.status === 404
+        ? "Booking detail endpoint is not available (404)"
+        : e?.message || "Failed to load booking detail";
     detailErrorMap.value = {
       ...detailErrorMap.value,
-      [id]: msg
-    }
-    showAlertModal({ type: e?.status === 404 ? 'warn' : 'error', message: msg })
+      [id]: msg,
+    };
+    showAlertModal({
+      type: e?.status === 404 ? "warn" : "error",
+      message: msg,
+    });
   } finally {
     if (detailLoadingId.value === id) {
-      detailLoadingId.value = ''
+      detailLoadingId.value = "";
     }
   }
 }
 
 async function onExportCsv() {
-  exportLoading.value = true
-  error.value = ''
+  exportLoading.value = true;
+  error.value = "";
   try {
-    const response = await api.adminExportBookings()
-    const  blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'bookings-export.csv'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    const response = await api.adminExportBookings();
+    const blob = new Blob([response.data], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "bookings-export.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   } catch (e) {
-    error.value = e?.message || 'Export failed'
-    showAlertModal({ type: 'error', message: error.value })
+    error.value = e?.message || "Export failed";
+    showAlertModal({ type: "error", message: error.value });
   } finally {
-    exportLoading.value = false
+    exportLoading.value = false;
   }
 }
 
-onMounted(load)
+onMounted(load);
 </script>
 
 <template>
@@ -220,11 +232,21 @@ onMounted(load)
             placeholder="Search bookings"
             aria-label="Search bookings"
           />
-          <button type="button" class="btn-neutral btn-refresh" :disabled="loading" @click="load">
-            {{ loading ? 'Loading...' : 'Refresh' }}
+          <button
+            type="button"
+            class="btn-neutral btn-refresh"
+            :disabled="loading"
+            @click="load"
+          >
+            {{ loading ? "Loading..." : "Refresh" }}
           </button>
-          <button type="button" class="btn-neutral" :disabled="exportLoading" @click="onExportCsv">
-            {{ exportLoading ? 'Exporting...' : 'Export CSV' }}
+          <button
+            type="button"
+            class="btn-neutral"
+            :disabled="exportLoading"
+            @click="onExportCsv"
+          >
+            {{ exportLoading ? "Exporting..." : "Export CSV" }}
           </button>
         </div>
       </div>
@@ -237,7 +259,10 @@ onMounted(load)
         Loading bookings...
       </div>
 
-      <div v-else-if="!(page.items || []).length && !missingApi" class="state state--empty">
+      <div
+        v-else-if="!(page.items || []).length && !missingApi"
+        class="state state--empty"
+      >
         No booking data.
       </div>
 
@@ -251,9 +276,15 @@ onMounted(load)
           :key="bookingId(booking)"
           class="booking-item"
         >
-          <button type="button" class="booking-summary" @click="toggleBooking(booking)">
+          <button
+            type="button"
+            class="booking-summary"
+            @click="toggleBooking(booking)"
+          >
             <div class="summary-main">
-              <div class="summary-id mono">{{ bookingId(booking) || '--' }}</div>
+              <div class="summary-id mono">
+                {{ bookingId(booking) || "--" }}
+              </div>
               <div class="summary-meta">
                 <span class="summary-label">Time</span>
                 <span class="summary-value">{{ bookingTime(booking) }}</span>
@@ -263,7 +294,9 @@ onMounted(load)
             <div class="summary-grid">
               <div class="summary-meta">
                 <span class="summary-label">Status</span>
-                <span :class="statusClass(booking)">{{ bookingStatus(booking) }}</span>
+                <span :class="statusClass(booking)">{{
+                  bookingStatus(booking)
+                }}</span>
               </div>
               <div class="summary-meta">
                 <span class="summary-label">Customer</span>
@@ -271,70 +304,112 @@ onMounted(load)
               </div>
               <div class="summary-meta">
                 <span class="summary-label">Specialist</span>
-                <span class="summary-value">{{ specialistLabel(booking) }}</span>
+                <span class="summary-value">{{
+                  specialistLabel(booking)
+                }}</span>
               </div>
             </div>
           </button>
 
-          <div v-if="expandedBookingId === bookingId(booking)" class="booking-detail">
-            <div v-if="detailLoadingId === bookingId(booking)" class="detail-state">
+          <div
+            v-if="expandedBookingId === bookingId(booking)"
+            class="booking-detail"
+          >
+            <div
+              v-if="detailLoadingId === bookingId(booking)"
+              class="detail-state"
+            >
               Loading booking detail...
             </div>
 
-            <div v-else-if="detailError(bookingId(booking))" class="state muted">
+            <div
+              v-else-if="detailError(bookingId(booking))"
+              class="state muted"
+            >
               {{ detailError(bookingId(booking)) }}
             </div>
 
-            <div v-else-if="detailRecord(bookingId(booking))" class="detail-grid">
+            <div
+              v-else-if="detailRecord(bookingId(booking))"
+              class="detail-grid"
+            >
               <div class="detail-row">
                 <span class="detail-key">Booking ID</span>
-                <span class="detail-value mono">{{ detailRecord(bookingId(booking))?.id ?? '--' }}</span>
+                <span class="detail-value mono">{{
+                  detailRecord(bookingId(booking))?.id ?? "--"
+                }}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-key">Status</span>
-                <span class="detail-value">{{ detailRecord(bookingId(booking))?.status ?? '--' }}</span>
+                <span class="detail-value">{{
+                  detailRecord(bookingId(booking))?.status ?? "--"
+                }}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-key">Customer</span>
                 <span class="detail-value">
-                  {{ detailRecord(bookingId(booking))?.customerName ?? detailRecord(bookingId(booking))?.customerId ?? '--' }}
+                  {{
+                    detailRecord(bookingId(booking))?.customerName ??
+                    detailRecord(bookingId(booking))?.customerId ??
+                    "--"
+                  }}
                 </span>
               </div>
               <div class="detail-row">
                 <span class="detail-key">Customer ID</span>
-                <span class="detail-value mono">{{ detailRecord(bookingId(booking))?.customerId ?? '--' }}</span>
+                <span class="detail-value mono">{{
+                  detailRecord(bookingId(booking))?.customerId ?? "--"
+                }}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-key">Specialist</span>
                 <span class="detail-value">
-                  {{ detailRecord(bookingId(booking))?.specialistName ?? detailRecord(bookingId(booking))?.specialistId ?? '--' }}
+                  {{
+                    detailRecord(bookingId(booking))?.specialistName ??
+                    detailRecord(bookingId(booking))?.specialistId ??
+                    "--"
+                  }}
                 </span>
               </div>
               <div class="detail-row">
                 <span class="detail-key">Specialist ID</span>
-                <span class="detail-value mono">{{ detailRecord(bookingId(booking))?.specialistId ?? '--' }}</span>
+                <span class="detail-value mono">{{
+                  detailRecord(bookingId(booking))?.specialistId ?? "--"
+                }}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-key">Time</span>
                 <span class="detail-value">
-                  {{ detailRecord(bookingId(booking))?.time ?? detailRecord(bookingId(booking))?.startTime ?? '--' }}
+                  {{
+                    detailRecord(bookingId(booking))?.time ??
+                    detailRecord(bookingId(booking))?.startTime ??
+                    "--"
+                  }}
                 </span>
               </div>
               <div class="detail-row">
                 <span class="detail-key">Price</span>
-                <span class="detail-value">{{ formatPrice(detailRecord(bookingId(booking))?.price) }}</span>
+                <span class="detail-value">{{
+                  formatPrice(detailRecord(bookingId(booking))?.price)
+                }}</span>
               </div>
               <div class="detail-row detail-row--full">
                 <span class="detail-key">Note</span>
-                <span class="detail-value detail-value--multiline">{{ bookingNote(detailRecord(bookingId(booking))) }}</span>
+                <span class="detail-value detail-value--multiline">{{
+                  bookingNote(detailRecord(bookingId(booking)))
+                }}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-key">Created</span>
-                <span class="detail-value">{{ detailRecord(bookingId(booking))?.createdAt ?? '--' }}</span>
+                <span class="detail-value">{{
+                  detailRecord(bookingId(booking))?.createdAt ?? "--"
+                }}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-key">Updated</span>
-                <span class="detail-value">{{ detailRecord(bookingId(booking))?.updatedAt ?? '--' }}</span>
+                <span class="detail-value">{{
+                  detailRecord(bookingId(booking))?.updatedAt ?? "--"
+                }}</span>
               </div>
             </div>
           </div>
@@ -342,10 +417,18 @@ onMounted(load)
       </div>
 
       <div v-if="(page.items || []).length && !missingApi" class="pager">
-        <button type="button" class="btn-neutral" :disabled="loading || (page.page ?? 1) <= 1" @click="prevPage">
+        <button
+          type="button"
+          class="btn-neutral"
+          :disabled="loading || (page.page ?? 1) <= 1"
+          @click="prevPage"
+        >
           Prev
         </button>
-        <span class="pager__info">Page {{ page.page }} / {{ totalPages() }} · Total {{ page.total }}</span>
+        <span class="pager__info"
+          >Page {{ page.page }} / {{ totalPages() }} · Total
+          {{ page.total }}</span
+        >
         <button
           type="button"
           class="btn-neutral"
@@ -646,7 +729,9 @@ onMounted(load)
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
 }
 
 @media (max-width: 900px) {

@@ -1,103 +1,99 @@
 ﻿<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import { api } from '@/api/client'
-import { showAlertModal } from '@/ui/alertModal'
-import { showConfirmModal } from '@/ui/confirmModal.js'
+import { computed, onMounted, ref, watch } from "vue";
+import { useAuthStore } from "@/stores/auth";
+import { api } from "@/api/client";
+import { showAlertModal } from "@/ui/alertModal";
+import { showConfirmModal } from "@/ui/confirmModal.js";
 
-
-const auth = useAuthStore()
-const specialistId = ref('')
-const slotDate = ref(new Date().toISOString().slice(0, 10))
-const slots = ref([])
-const loading = ref(false)
-const error = ref('')
-const busySlotId = ref('')
-// automatically derive the specialist ID from the logged-in user profile
-const hintId = computed(() => auth.user?.specialistId ?? auth.user?.id ?? '')
-
-// initialize specialistId from the auth store whenever hintId becomes available
+const auth = useAuthStore();
+const specialistId = ref("");
+const slotDate = ref(new Date().toISOString().slice(0, 10));
+const slots = ref([]);
+const loading = ref(false);
+const error = ref("");
+const busySlotId = ref("");
+const hintId = computed(() => auth.user?.specialistId ?? auth.user?.id ?? "");
 watch(
-    hintId,
-    (v) => {
-      if (v && !specialistId.value) {
-        specialistId.value = String(v)
-      }
-    },
-    { immediate: true }
-)
-// fetch time slots for the specialist from the backend.
+  hintId,
+  (v) => {
+    if (v && !specialistId.value) {
+      specialistId.value = String(v);
+    }
+  },
+  { immediate: true },
+);
 async function loadSlots() {
   if (!specialistId.value.trim()) {
-    slots.value = []
-    return
+    slots.value = [];
+    return;
   }
-  error.value = ''
-  loading.value = true
+  error.value = "";
+  loading.value = true;
   try {
-    slots.value = await api.listSpecialistSlots(specialistId.value.trim(), { date: slotDate.value })
+    slots.value = await api.listSpecialistSlots(specialistId.value.trim(), {
+      date: slotDate.value,
+    });
   } catch (e) {
-    error.value = e?.message || 'Failed to load slots'
-    slots.value = []
+    error.value = e?.message || "Failed to load slots";
+    slots.value = [];
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
-/*Handles the "Complete" action for a confirmed booking.
-  Opens a confirmation modal before proceeding.*/
+// show confirmation first
 async function handleComplete(slotId, bookingId) {
   if (!bookingId) {
-    error.value = 'No booking found for this slot'
-    return
+    error.value = "No booking found for this slot";
+    return;
   }
 
   showConfirmModal({
-    title: 'Complete Reservation',
-    message: 'Are you sure that this reservation service has been completed?  \n' +
-        'Once confirmed, the status will change to \'Completed\'.',
+    title: "Complete Reservation",
+    message:
+      "Are you sure that this reservation service has been completed?  \n" +
+      "Once confirmed, the status will change to 'Completed'.",
     onConfirm: async () => {
-      busySlotId.value = slotId // disable button for this specific slot
+      busySlotId.value = slotId;
       try {
-        await api.completeBooking(bookingId)
+        await api.completeBooking(bookingId);
 
         showAlertModal({
-          title: 'Success',
-          message: 'Booking completed successfully.',
-          type: 'success'
-        })
+          title: "Success",
+          message: "Booking completed successfully.",
+          type: "success",
+        });
 
-        await loadSlots() // refresh data
+        await loadSlots();
       } catch (e) {
-        error.value = e?.message || 'Failed to complete booking'
+        error.value = e?.message || "Failed to complete booking";
         showAlertModal({
-          title: 'Error',
+          title: "Error",
           message: error.value,
-          type: 'error'
-        })
+          type: "error",
+        });
       } finally {
-        busySlotId.value = ''
+        busySlotId.value = "";
       }
-    }
-  })
+    },
+  });
 }
-// map a status string to a corresponding CSS class for styling badges.
 function getStatusClass(status) {
-  if (!status) return ''
-  const lowerStatus = status.toLowerCase()
-  return `badge--${lowerStatus}`
+  if (!status) return "";
+  const lowerStatus = status.toLowerCase();
+  return `badge--${lowerStatus}`;
 }
 
 watch([specialistId, slotDate], () => {
   if (specialistId.value.trim()) {
-    loadSlots()
+    loadSlots();
   }
-})
+});
 
 onMounted(() => {
   if (specialistId.value.trim()) {
-    loadSlots()
+    loadSlots();
   }
-})
+});
 </script>
 
 <template>
@@ -109,19 +105,28 @@ onMounted(() => {
     <div class="card">
       <div class="title">Search Filters</div>
       <div class="filters-grid">
-        <!-- 只保留日期筛选 -->
+        
         <label class="field field--date">
           <span class="label">Date</span>
           <input v-model="slotDate" type="date" class="input" />
         </label>
         <div class="field field--refresh">
           <span class="label label--ghost">Action</span>
-          <button type="button" class="btn" :disabled="loading" @click="loadSlots">Refresh</button>
+          <button
+            type="button"
+            class="btn"
+            :disabled="loading"
+            @click="loadSlots"
+          >
+            Refresh
+          </button>
         </div>
       </div>
     </div>
 
-    <div v-if="error" class="banner banner--error" role="alert">{{ error }}</div>
+    <div v-if="error" class="banner banner--error" role="alert">
+      {{ error }}
+    </div>
 
     <div class="card">
       <div class="title">Available Slots</div>
@@ -130,44 +135,57 @@ onMounted(() => {
       <div v-else-if="slots.length" class="slots-table-wrap">
         <table class="slots-table">
           <thead>
-          <tr>
-            <th>Time</th>
-            <th>Customer</th>
-            <th>Status</th>
-            <th class="th-action">Action</th>
-          </tr>
+            <tr>
+              <th>Time</th>
+              <th>Customer</th>
+              <th>Status</th>
+              <th class="th-action">Action</th>
+            </tr>
           </thead>
           <tbody>
-          <tr v-for="sl in slots" :key="sl.slotId ?? sl.id">
-            <td>
-              <span>{{ sl.start ?? sl.startTime }}</span>
-              <span> — </span>
-              <span>{{ sl.end ?? sl.endTime }}</span>
-            </td>
-            <td>{{ sl.bookingId && sl.customerName ? sl.customerName : '—' }}</td>
-            <td>
-              <span v-if="sl.status" class="badge" :class="getStatusClass(sl.status)">{{ sl.status }}</span>
-              <span v-else-if="sl.available === false" class="muted small">Full</span>
-              <span v-else class="muted small">Available</span>
-            </td>
-            <td class="cell-action">
-              <button
+            <tr v-for="sl in slots" :key="sl.slotId ?? sl.id">
+              <td>
+                <span>{{ sl.start ?? sl.startTime }}</span>
+                <span> — </span>
+                <span>{{ sl.end ?? sl.endTime }}</span>
+              </td>
+              <td>
+                {{ sl.bookingId && sl.customerName ? sl.customerName : "—" }}
+              </td>
+              <td>
+                <span
+                  v-if="sl.status"
+                  class="badge"
+                  :class="getStatusClass(sl.status)"
+                  >{{ sl.status }}</span
+                >
+                <span v-else-if="sl.available === false" class="muted small"
+                  >Full</span
+                >
+                <span v-else class="muted small">Available</span>
+              </td>
+              <td class="cell-action">
+                <button
                   v-if="sl.bookingId && sl.status === 'Confirmed'"
                   type="button"
                   class="btn-complete"
                   :disabled="busySlotId === (sl.slotId ?? sl.id)"
                   @click="handleComplete(sl.slotId ?? sl.id, sl.bookingId)"
-              >
-                {{ busySlotId === (sl.slotId ?? sl.id) ? '...' : 'Complete' }}
-              </button>
-            </td>
-          </tr>
+                >
+                  {{ busySlotId === (sl.slotId ?? sl.id) ? "..." : "Complete" }}
+                </button>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
 
-      <p v-else-if="!loading && specialistId.trim()" class="muted small">No slots found for this date.</p>
-      <p v-else-if="!loading" class="muted small">No data. Enter a specialist ID and select a date.</p>
+      <p v-else-if="!loading && specialistId.trim()" class="muted small">
+        No slots found for this date.
+      </p>
+      <p v-else-if="!loading" class="muted small">
+        No data. Enter a specialist ID and select a date.
+      </p>
     </div>
   </section>
 </template>
@@ -191,7 +209,7 @@ onMounted(() => {
   font-size: 12px;
 }
 
-/* Card & Input Components */
+
 .card {
   margin-top: 14px;
   padding: 16px;
@@ -211,9 +229,7 @@ onMounted(() => {
   margin-bottom: 10px;
   max-width: 420px;
 }
-/*Filters Grid Layout
-layout: date + refrash button
-*/
+
 .filters-grid {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) 140px;
@@ -262,9 +278,7 @@ layout: date + refrash button
 .btn:disabled {
   opacity: 0.6;
 }
-/**
- * Table & Row Styles
- */
+
 .slots-table-wrap {
   overflow-x: auto;
   border: 1px solid #eceff3;
@@ -360,9 +374,7 @@ layout: date + refrash button
   opacity: 0.5;
   cursor: not-allowed;
 }
-/**
- * Responsive Overrides
- */
+
 @media (max-width: 980px) {
   .filters-grid {
     grid-template-columns: 1fr;

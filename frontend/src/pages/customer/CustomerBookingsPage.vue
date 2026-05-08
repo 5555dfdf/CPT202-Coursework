@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { api } from '@/api/client'
 import CustomerBookingDetailPage from '@/pages/customer/CustomerBookingDetailPage.vue'
 
+// filters, pagination, detail modal
 const route = useRoute()
 const status = ref('')
 const page = ref({ items: [], total: 0, page: 1, pageSize: 10 })
@@ -28,7 +29,6 @@ function statusClass(v) {
   if (s === 'cancelled' || s === 'rejected') return 'status--bad'
   return ''
 }
-
 async function load() {
   error.value = ''
   loading.value = true
